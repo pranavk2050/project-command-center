@@ -458,7 +458,7 @@ function InteractiveMindMap({ tree, title }) {
 }
 
 /* ═══ AI ASSISTANT AGENT ═══ */
-function AIAssistant({ projects, tasks, logs, milestones, onAddTask, onAddLog, onAddMilestone }) {
+function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTask, onAddLog, onAddMilestone }) {
   const [provider, setProvider] = useState(() => localStorage.getItem("ai_provider") || "");
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("ai_key") || "");
   const [keyInput, setKeyInput] = useState("");
@@ -505,7 +505,8 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddTask, onAddLog, o
 RULES:
 - Be concise and direct. Use short paragraphs, not long essays.
 - When asked analytical questions, reference specific data (project names, task counts, dates).
-- When asked to add a task/log/milestone, respond with a JSON action block wrapped in <action> tags. Use the project ID from the data.
+- For task/log/milestone/project actions, respond with a JSON action block wrapped EXACTLY in <action> and </action> tags — no other format, no parentheses, no question marks. Example: <action>{"type":"task",...}</action>
+- For project: <action>{"type":"project","name":"...","description":"...","owner":"...","targetEnd":"YYYY-MM-DD"}</action>
 - For task: <action>{"type":"task","title":"...","projectId":"...","priority":"High/Medium/Low","status":"Not Started","deadline":"YYYY-MM-DD","assignedBy":"...","source":"Email/Meeting/Chat/Self"}</action>
 - For log: <action>{"type":"log","activity":"...","duration":"...","projectId":"...","category":"Meeting / Call|Task Progress|Email / Follow-up|Review / Approval|Problem Solving|Coordination|Learning / Training|Reporting / MIS","outcome":"..."}</action>
 - For milestone: <action>{"type":"milestone","title":"...","projectId":"...","targetDate":"YYYY-MM-DD","status":"Not Started","progress":0}</action>
@@ -589,25 +590,35 @@ DATA:\n${ctx}`;
       else if (provider === "gemini") reply = await callGemini(userText, history);
       else reply = await callGroq(userText, history);
 
-      // Parse actions - flexible matching for different AI models
+      // Parse actions - flexible matching for different AI model output formats
       let actionJson = null;
-      // Try standard <action>...</action>
       let actionMatch = reply.match(/<action>([\s\S]*?)<\/action>/);
-      if (!actionMatch) actionMatch = reply.match(/\?action([\s\S]*?)<\/action>/);
-      if (!actionMatch) actionMatch = reply.match(/\[action\]([\s\S]*?)\[\/action\]/);
-      // Try finding raw JSON with type field
+      if (!actionMatch) actionMatch = reply.match(/[\(\[\?]action>?([\s\S]*?)<?\/?action[\)\]]?>?/i);
       if (!actionMatch) {
-        const jsonMatch = reply.match(/\{[^{}]*"type"\s*:\s*"(task|log|milestone)"[^{}]*\}/);
+        const jsonMatch = reply.match(/\{[\s\S]*?"type"\s*:\s*"(task|log|milestone|project)"[\s\S]*?\}/);
         if (jsonMatch) actionMatch = [jsonMatch[0], jsonMatch[0]];
       }
       if (actionMatch) {
         try {
-          const action = JSON.parse(actionMatch[1].trim());
+          let jsonStr = actionMatch[1].trim();
+          // Clean stray characters some models add
+          jsonStr = jsonStr.replace(/^[>\)\]]+|[<\(\[]+$/g, "").trim();
+          const action = JSON.parse(jsonStr);
           if (action.projectName && !action.projectId) {
             const match = projects.find(p => p.name.toLowerCase().includes(action.projectName.toLowerCase()));
             if (match) action.projectId = match.id;
           }
-          if (action.type === "task" && action.title) {
+          if (action.type === "project" && (action.name || action.title)) {
+            const newProj = {
+              id: uid(), name: action.name || action.title, description: action.description || "",
+              owner: action.owner || action.stakeholder || "", startDate: todayStr(),
+              targetEnd: action.targetEnd || action.deadline || "",
+              color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)],
+              createdAt: todayStr()
+            };
+            onAddProject(newProj);
+            actionJson = { type: "project", title: newProj.name };
+          } else if (action.type === "task" && action.title) {
             onAddTask({ ...action, id: uid(), createdAt: todayStr(), updatedAt: todayStr(), description: "", remarks: "", source: action.source || "Self", projectId: action.projectId || "" });
             actionJson = action;
           } else if (action.type === "log" && action.activity) {
@@ -617,10 +628,9 @@ DATA:\n${ctx}`;
             onAddMilestone({ ...action, id: uid(), notes: "" });
             actionJson = action;
           }
-        } catch (e) { console.error("Action parse error:", e); }
-        // Clean action tags from reply text
-        reply = reply.replace(/<\/?action>|\/action>|\?action/g, "").trim();
-        reply = reply.replace(/\{[^{}]*"type"\s*:\s*"(task|log|milestone)"[^{}]*\}/, "").trim();
+        } catch (e) { console.error("Action parse error:", e, actionMatch[1]); }
+        reply = reply.replace(/[\(\[\?]?action>?[\s\S]*?<?\/?action[\)\]]?>?/i, "").trim();
+        reply = reply.replace(/\{[\s\S]*?"type"\s*:\s*"(task|log|milestone|project)"[\s\S]*?\}/, "").trim();
       }
       if (!reply && actionJson) reply = "Done! I've added the " + actionJson.type + ": \"" + (actionJson.title || actionJson.activity) + "\"";
       if (!reply) reply = "Done!";
@@ -1034,6 +1044,7 @@ function App(){
         {view==="journeymap"&&<InteractiveMindMap tree={journeyTree} title="🗺️ All Projects — Journey Mind Map" />}
 
         {view==="ai"&&<AIAssistant projects={projects} tasks={tasks} logs={logs} milestones={milestones}
+          onAddProject={p=>{update(setProjects,"projects",[...projects,p]);}}
           onAddTask={t=>{update(setTasks,"tasks",[...tasks,t]);}}
           onAddLog={l=>{update(setLogs,"logs",[l,...logs]);}}
           onAddMilestone={m=>{update(setMilestones,"milestones",[...milestones,m]);}} />}
