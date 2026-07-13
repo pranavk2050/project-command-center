@@ -9,10 +9,20 @@
       "color": "#7C3AED",
       "id": "mrj39rr1iu2j2",
       "createdAt": "2026-07-13"
+    },
+    {
+      "name": "Video Analytics : NHSRCL",
+      "description": "complete two use cases in VSS \n1. PPE Detection\n2. Person Under Suspended Load",
+      "owner": "Pranav",
+      "startDate": "2026-07-13",
+      "targetEnd": "2026-07-17",
+      "color": "#DC2626",
+      "id": "mrj3bl7yk558j",
+      "createdAt": "2026-07-13"
     }
   ],
   "tasks": [],
   "logs": [],
   "milestones": [],
-  "lastUpdated": "2026-07-13T10:38:05.246Z"
+  "lastUpdated": "2026-07-13T10:39:30.094Z"
 }
