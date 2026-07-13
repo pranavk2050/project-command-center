@@ -590,6 +590,7 @@ RULES:
 - If the user asks to undo, restore, bring back, or recover something that was deleted, use restore_deleted_item — it searches actual saved history and recovers the real original data (not a fresh recreation with the same name). It may take a few seconds since it searches through past saves. If it can't find a match, say so plainly rather than offering to "recreate" a lookalike unless the user asks for that instead.
 - If the user asks you to draft, write, or summarize the business value of a project, look at that project's tasks, milestones, and logs already in the DATA below and propose a short value statement in your reply (1-2 plain sentences, pick the best-fitting category from: Cost Savings / Efficiency, Risk / Compliance, Revenue / Client Impact, Process Improvement, Capability Building, and suggest a rough impact estimate if one is reasonably inferable). Do NOT call set_project_value yet at this stage — just propose it and ask if they'd like it saved. Only call set_project_value once the user approves it or gives you a statement to save directly.
 - Always use an existing project's id from the data when given. If the user names a project that doesn't exist yet, ask whether to create it first (or create it if that seems clearly intended).
+- When passing a project/task/milestone name as a tool argument (projectName, taskTitle, milestoneTitle, etc.), use ONLY the plain name/title — never copy the "[id:...]" bracket tag from the DATA section into these arguments.
 - After using tools, give a short natural confirmation summarizing what you did.
 - For weekly summaries or analysis questions, give a structured brief: tasks completed, in progress, overdue, key activity, recommendations — no tool needed for these.
 - Be encouraging but professional. This data may be shown to senior leadership.
@@ -597,12 +598,25 @@ RULES:
 DATA:\n${ctx}`;
   };
 
+  // Models sometimes echo the "[id:...]" tag straight out of their own context data
+  // into a name argument (e.g. "Video Analytics : NHSRCL [mrj3bl7yk558j]"). Strip
+  // bracket content and match in both directions so this doesn't cause false "not found".
+  const cleanMatchText = s => String(s || "").replace(/\[[^\]]*\]/g, "").trim().toLowerCase();
+  const fuzzyMatches = (list, field, search) => {
+    const cleanSearch = cleanMatchText(search);
+    if (!cleanSearch) return [];
+    return list.filter(item => {
+      const cleanField = cleanMatchText(item[field]);
+      return cleanField.includes(cleanSearch) || cleanSearch.includes(cleanField);
+    });
+  };
+
   const resolveProjectId = (idOrName) => {
     if (!idOrName) return "";
     const direct = projects.find(p => p.id === idOrName);
     if (direct) return direct.id;
-    const byName = projects.find(p => p.name.toLowerCase().includes(String(idOrName).toLowerCase()));
-    return byName ? byName.id : idOrName;
+    const matches = fuzzyMatches(projects, "name", idOrName);
+    return matches[0] ? matches[0].id : idOrName;
   };
 
   const executeTool = async (name, args) => {
@@ -631,27 +645,27 @@ DATA:\n${ctx}`;
         return { success: true, message: "Created milestone '" + ms.title + "'" };
       }
       if (name === "update_task_status") {
-        const match = tasks.find(t => t.title.toLowerCase().includes(String(args.taskTitle || "").toLowerCase()));
+        const match = fuzzyMatches(tasks, "title", args.taskTitle)[0];
         if (!match) return { success: false, message: "No task found matching '" + args.taskTitle + "'" };
         onUpdateTask({ ...match, status: args.newStatus, updatedAt: todayStr() });
         return { success: true, message: "Updated '" + match.title + "' to " + args.newStatus };
       }
       if (name === "delete_project") {
-        const matches = projects.filter(p => p.name.toLowerCase().includes(String(args.projectName || "").toLowerCase()));
+        const matches = fuzzyMatches(projects, "name", args.projectName);
         if (matches.length === 0) return { success: false, message: "No project found matching '" + args.projectName + "'" };
         if (matches.length > 1) return { success: false, message: "Multiple projects match: " + matches.map(m => m.name).join(", ") + ". Ask the user to be more specific." };
         onDeleteProject(matches[0].id);
         return { success: true, message: "Deleted project '" + matches[0].name + "' and all its tasks, logs, and milestones." };
       }
       if (name === "delete_task") {
-        const matches = tasks.filter(t => t.title.toLowerCase().includes(String(args.taskTitle || "").toLowerCase()));
+        const matches = fuzzyMatches(tasks, "title", args.taskTitle);
         if (matches.length === 0) return { success: false, message: "No task found matching '" + args.taskTitle + "'" };
         if (matches.length > 1) return { success: false, message: "Multiple tasks match: " + matches.map(m => m.title).join(", ") + ". Ask the user to be more specific." };
         onDeleteTask(matches[0].id);
         return { success: true, message: "Deleted task '" + matches[0].title + "'" };
       }
       if (name === "delete_log") {
-        let candidates = logs.filter(l => l.activity.toLowerCase().includes(String(args.activityText || "").toLowerCase()));
+        let candidates = fuzzyMatches(logs, "activity", args.activityText);
         if (args.date) candidates = candidates.filter(l => l.date === args.date);
         if (candidates.length === 0) return { success: false, message: "No log entry found matching that description." };
         if (candidates.length > 1) return { success: false, message: "Multiple log entries match. Ask the user for a date to narrow it down." };
@@ -659,7 +673,7 @@ DATA:\n${ctx}`;
         return { success: true, message: "Deleted log entry: '" + candidates[0].activity + "'" };
       }
       if (name === "delete_milestone") {
-        const matches = milestones.filter(m => m.title.toLowerCase().includes(String(args.milestoneTitle || "").toLowerCase()));
+        const matches = fuzzyMatches(milestones, "title", args.milestoneTitle);
         if (matches.length === 0) return { success: false, message: "No milestone found matching '" + args.milestoneTitle + "'" };
         if (matches.length > 1) return { success: false, message: "Multiple milestones match: " + matches.map(m => m.title).join(", ") + ". Ask the user to be more specific." };
         onDeleteMilestone(matches[0].id);
@@ -672,7 +686,7 @@ DATA:\n${ctx}`;
         const arrKey = itemType === "project" ? "projects" : itemType === "task" ? "tasks" : itemType === "log" ? "logs" : itemType === "milestone" ? "milestones" : null;
         if (!arrKey) return { success: false, message: "itemType must be project, task, log, or milestone." };
         const nameField = arrKey === "logs" ? "activity" : arrKey === "projects" ? "name" : "title";
-        const searchLower = String(args.searchText || "").toLowerCase();
+        const searchLower = cleanMatchText(args.searchText);
 
         const commitsRes = await fetch("https://api.github.com/repos/" + REPO + "/commits?path=data.json&per_page=50", { headers: { "Authorization": "token " + ghToken, "Accept": "application/vnd.github+json" } });
         if (!commitsRes.ok) return { success: false, message: "Couldn't fetch history from GitHub (status " + commitsRes.status + ")." };
@@ -683,7 +697,7 @@ DATA:\n${ctx}`;
             const raw = await fetch("https://raw.githubusercontent.com/" + REPO + "/" + commit.sha + "/data.json");
             if (!raw.ok) continue;
             const snapshot = await raw.json();
-            const found = (snapshot[arrKey] || []).find(item => (item[nameField] || "").toLowerCase().includes(searchLower));
+            const found = (snapshot[arrKey] || []).find(item => { const f = cleanMatchText(item[nameField]); return f.includes(searchLower) || searchLower.includes(f); });
             if (!found) continue;
 
             const currentList = arrKey === "projects" ? projects : arrKey === "tasks" ? tasks : arrKey === "logs" ? logs : milestones;
@@ -707,7 +721,7 @@ DATA:\n${ctx}`;
         return { success: false, message: "Couldn't find '" + args.searchText + "' as a deleted " + itemType + " in the last 50 saves. It may be older than that." };
       }
       if (name === "set_project_value") {
-        const matches = projects.filter(p => p.name.toLowerCase().includes(String(args.projectName || "").toLowerCase()));
+        const matches = fuzzyMatches(projects, "name", args.projectName);
         if (matches.length === 0) return { success: false, message: "No project found matching '" + args.projectName + "'" };
         if (matches.length > 1) return { success: false, message: "Multiple projects match: " + matches.map(m => m.name).join(", ") + ". Ask the user to be more specific." };
         const proj = matches[0];
