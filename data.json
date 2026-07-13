@@ -92,20 +92,6 @@
       "remarks": ""
     },
     {
-      "id": "mrjgpev1w8km9",
-      "title": "Create Technical Document for Architecture",
-      "description": "",
-      "assignedBy": "",
-      "source": "Self",
-      "priority": "High",
-      "status": "Not Started",
-      "deadline": "2026-07-16",
-      "projectId": "mrj3bl7yk558j",
-      "remarks": "",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13"
-    },
-    {
       "id": "mrjgx6gvlrwix",
       "title": "Create Technical Document for Architecture",
       "description": "",
@@ -195,5 +181,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T17:00:40.530Z"
+  "lastUpdated": "2026-07-13T17:00:42.968Z"
 }
