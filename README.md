@@ -33,7 +33,8 @@ A single self-contained `index.html` file (React + Babel loaded via CDN, no buil
 
 This is a genuine **agentic tool-calling** setup, not text parsing:
 
-- Defined tools (see `AGENT_TOOLS` in the code): `create_project`, `create_task`, `create_log`, `create_milestone`, `update_task_status`
+- Defined tools (see `AGENT_TOOLS` in the code): `create_project`, `create_task`, `create_log`, `create_milestone`, `update_task_status`, `delete_project`, `delete_task`, `delete_log`, `delete_milestone`
+- Delete tools match by text (project/task/milestone name, or log activity text + optional date) rather than by ID, since the user speaks in names not IDs. If a match is ambiguous (multiple hits), the tool refuses and asks the AI to get a more specific match from the user rather than guessing and deleting the wrong thing. `delete_project` cascades — it also removes that project's tasks, logs, and milestones. The system prompt explicitly instructs the model to only call delete tools on clear, explicit user request — never proactively or as a side effect.
 - Each provider gets the same tools translated to its native schema:
   - **Anthropic** — `tools` param with `input_schema`, response `tool_use` blocks
   - **Groq** (OpenAI-compatible) — `tools` param with `function.parameters`, response `tool_calls`
