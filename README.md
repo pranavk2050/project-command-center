@@ -33,8 +33,14 @@ A single self-contained `index.html` file (React + Babel loaded via CDN, no buil
 
 This is a genuine **agentic tool-calling** setup, not text parsing:
 
-- Defined tools (see `AGENT_TOOLS` in the code): `create_project`, `create_task`, `create_log`, `create_milestone`, `update_task_status`, `delete_project`, `delete_task`, `delete_log`, `delete_milestone`, `restore_deleted_item`
+- Defined tools (see `AGENT_TOOLS` in the code): `create_project`, `create_task`, `create_log`, `create_milestone`, `update_task_status`, `delete_project`, `delete_task`, `delete_log`, `delete_milestone`, `restore_deleted_item`, `set_project_value`
 - `restore_deleted_item` is the agent-native version of the manual recovery done earlier: it fetches the last 50 commits of `data.json` via the GitHub API (using the same `gh_token` from `localStorage`), walks backward through each commit's raw content until it finds a matching project/task/log/milestone, and re-adds the *original* object (same id, same fields) rather than creating a lookalike. For a project restore, it also pulls back that project's associated tasks/logs/milestones from the same historical snapshot. This makes `executeTool` async — all four `run*Agent` loops call it with `await` in a sequential `for...of` (not `.map`/`.forEach`, which don't properly await inside callbacks).
+
+## Business value tracking
+
+Each project can carry an optional value record: `valueCategory` (one of five presets — Cost Savings/Efficiency, Risk/Compliance, Revenue/Client Impact, Process Improvement, Capability Building), `valueStatement` (1-2 plain sentences for leadership), and `valueImpact` (optional rough estimate). These show up as a "💡 Value delivered to the organization" card on the Overview dashboard, above the project grid — a running list leadership can skim without opening individual projects.
+
+The AI Assistant can draft these for you: ask it to "draft the business value for [project]" — the system prompt instructs it to look at that project's existing tasks/milestones/logs (already in its data context) and propose a category + statement + rough impact in its reply, without saving anything yet. Once you approve (or hand it your own wording), it calls `set_project_value` to actually save it. This two-step "propose, then save on approval" pattern is intentional — it keeps the AI from writing leadership-facing claims about your work without you signing off first.
 - Delete tools match by text (project/task/milestone name, or log activity text + optional date) rather than by ID, since the user speaks in names not IDs. If a match is ambiguous (multiple hits), the tool refuses and asks the AI to get a more specific match from the user rather than guessing and deleting the wrong thing. `delete_project` cascades — it also removes that project's tasks, logs, and milestones. The system prompt explicitly instructs the model to only call delete tools on clear, explicit user request — never proactively or as a side effect.
 - Each provider gets the same tools translated to its native schema:
   - **Anthropic** — `tools` param with `input_schema`, response `tool_use` blocks
