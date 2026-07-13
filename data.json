@@ -120,6 +120,20 @@
       "updatedAt": "2026-07-13",
       "description": "",
       "remarks": ""
+    },
+    {
+      "id": "mrjg4q5xqof4u",
+      "title": "Create Technical Document for Architecture",
+      "description": "Create a detailed technical document outlining the architecture of the Video Analytics project",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "2026-07-16",
+      "projectId": "mrj3bl7yk558j",
+      "remarks": "",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13"
     }
   ],
   "logs": [
@@ -154,5 +168,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T16:27:25.349Z"
+  "lastUpdated": "2026-07-13T16:38:04.917Z"
 }
