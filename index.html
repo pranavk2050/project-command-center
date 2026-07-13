@@ -561,6 +561,7 @@ RULES:
 - Be concise and direct. Use short paragraphs, not long essays.
 - When asked analytical questions, reference specific data (project names, task counts, dates).
 - When the user asks you to add/create/log/update something, use the appropriate tool. You may call multiple tools in sequence if the request needs it (e.g. "create a project and add 3 tasks to it").
+- CRITICAL: Never say something was created, added, updated, or logged unless you actually called the matching tool in this turn and it succeeded. Do not describe a project/task/log/milestone as done, give it an ID, or write confirmation text like "has been created" without a real tool call behind it. If you're not calling a tool, don't claim an action happened — just answer or ask a clarifying question instead.
 - Always use an existing project's id from the data when given. If the user names a project that doesn't exist yet, ask whether to create it first (or create it if that seems clearly intended).
 - After using tools, give a short natural confirmation summarizing what you did.
 - For weekly summaries or analysis questions, give a structured brief: tasks completed, in progress, overdue, key activity, recommendations — no tool needed for these.
@@ -755,7 +756,9 @@ DATA:\n${ctx}`;
     setInput("");
     setLoading(true);
 
+    let toolCallCount = 0;
     const onTrace = (name, args) => {
+      toolCallCount++;
       setMessages(prev => [...prev, { role: "trace", text: "🔧 " + toolLabel(name, args) }]);
     };
 
@@ -769,6 +772,14 @@ DATA:\n${ctx}`;
       else if (provider === "gemini") reply = await runGeminiAgent(userText, history, onTrace);
       else if (provider === "ollama") reply = await runOllamaAgent(userText, history, onTrace);
       else reply = await runGroqAgent(userText, history, onTrace);
+
+      // Safety net: some smaller/free models occasionally narrate a fake success
+      // ("Project X has been created") without actually calling the tool.
+      // Detect that pattern and correct the record instead of letting it mislead the user.
+      const claimsAction = /\b(has been (created|added|updated|logged|marked)|project.{0,20}(created|added)|task.{0,20}(created|added)|i('ve| have) (created|added|updated|logged))\b/i.test(reply || "");
+      if (toolCallCount === 0 && claimsAction) {
+        reply = "⚠️ " + reply + "\n\n(Heads up: I didn't actually detect a real action being taken for this — no tool ran. Nothing was added to your dashboard yet. Try rephrasing your request, e.g. \"please create a project called X\" — or switch providers if this keeps happening.)";
+      }
 
       setMessages(prev => [...prev, { role: "assistant", text: reply || "Done!" }]);
     } catch (e) {
