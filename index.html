@@ -959,6 +959,74 @@ DATA:\n${ctx}`;
   );
 }
 
+/* ═══ WHIZIBLE TIMESHEET EXPORT ═══ */
+function WhizibleExport({ logs, projects }) {
+  const [open, setOpen] = useState(false);
+  const [fromDate, setFromDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split("T")[0]; });
+  const [toDate, setToDate] = useState(todayStr());
+  const [output, setOutput] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const generate = () => {
+    const inRange = logs.filter(l => l.date >= fromDate && l.date <= toDate);
+    const byDate = {};
+    inRange.forEach(l => { if (!byDate[l.date]) byDate[l.date] = []; byDate[l.date].push(l); });
+    const dates = Object.keys(byDate).sort();
+
+    if (!dates.length) { setOutput("No log entries found in that date range."); return; }
+
+    let text = "";
+    dates.forEach(date => {
+      const entries = byDate[date];
+      const dayName = new Date(date).toLocaleDateString("en-IN", { weekday: "short" });
+      const d = date.split("-");
+      text += dayName + " " + d[2] + "-" + new Date(date).toLocaleDateString("en-IN", { month: "short" }) + "-" + d[0] + ":\n";
+      let totalHrs = 0;
+      entries.forEach(l => {
+        const proj = projects.find(p => p.id === l.projectId);
+        const jobCode = proj?.jobCode || "(no job code set)";
+        const taskCode = l.taskCode || "(no task code set)";
+        const mins = parseMins(l.duration);
+        const hrs = mins ? Math.round((mins / 60) * 10) / 10 : 0;
+        totalHrs += hrs;
+        text += "  Job=" + jobCode + ", Task=" + taskCode + ", Hours=" + hrs + "\n";
+        text += "    Description: \"" + l.activity + (l.outcome ? " — " + l.outcome : "") + "\"\n";
+      });
+      const flag = totalHrs === 8.5 ? "✓" : "⚠ expected 8.5";
+      text += "  (Daily total = " + totalHrs + " hrs " + flag + ")\n\n";
+    });
+    setOutput(text.trim());
+    setCopied(false);
+  };
+
+  const copyOut = () => {
+    navigator.clipboard.writeText(output).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  };
+
+  return (
+    <div className="card" style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setOpen(!open)}>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>📤 Export for Whizible timesheet</div>
+        <span style={{ fontSize: 12, color: "#64748B" }}>{open ? "▲ collapse" : "▼ expand"}</span>
+      </div>
+      {open && <div style={{ marginTop: 14 }}>
+        <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12, lineHeight: 1.5 }}>
+          Generates a formatted block from your log entries for a date range, matching the Job/Task/Hours/Description format Whizible needs. Copy it and hand it to Claude in Chrome along with your process notes to auto-fill.
+        </p>
+        <div className="grid-2" style={{ marginBottom: 10 }}>
+          <div className="field"><label className="field-label">From</label><input type="date" className="field-input" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div>
+          <div className="field"><label className="field-label">To</label><input type="date" className="field-input" value={toDate} onChange={e => setToDate(e.target.value)} /></div>
+        </div>
+        <button className="btn btn-primary" onClick={generate} style={{ marginBottom: 12 }}>Generate export</button>
+        {output && <>
+          <textarea readOnly value={output} style={{ width: "100%", minHeight: 220, fontFamily: "monospace", fontSize: 12, padding: 12, border: "1px solid #E2E8F0", borderRadius: 8, background: "#F8FAFC", boxSizing: "border-box" }} />
+          <button className="btn btn-secondary" onClick={copyOut} style={{ marginTop: 8 }}>{copied ? "✓ Copied!" : "📋 Copy to clipboard"}</button>
+        </>}
+      </div>}
+    </div>
+  );
+}
+
 /* ═══ TIME DISTRIBUTION DASHBOARD ═══ */
 function parseMins(dur) {
   if (!dur) return 0;
@@ -1091,8 +1159,10 @@ function TimeDistribution({ logs }) {
 }
 
 /* ═══ FORMS ═══ */
-function ProjectForm({existing,onSave,onCancel}){const[f,setF]=useState(existing||{name:"",description:"",owner:"",startDate:todayStr(),targetEnd:"",color:PROJECT_COLORS[Math.floor(Math.random()*PROJECT_COLORS.length)]});const set=(k,v)=>setF(p=>({...p,[k]:v}));return<><div className="field"><label className="field-label">Project Name *</label><input className="field-input" value={f.name} onChange={e=>set("name",e.target.value)} placeholder="e.g. Q3 Internal Audit"/></div><div className="field"><label className="field-label">Description</label><textarea className="field-input" value={f.description} onChange={e=>set("description",e.target.value)}/></div><div className="grid-2"><div className="field"><label className="field-label">Stakeholder</label><input className="field-input" value={f.owner} onChange={e=>set("owner",e.target.value)}/></div><div className="field"><label className="field-label">Color</label><div className="color-picker">{PROJECT_COLORS.map(c=><button key={c} className={"color-btn "+(f.color===c?"active":"")} style={{background:c}} onClick={()=>set("color",c)}/>)}</div></div><div className="field"><label className="field-label">Start Date</label><input type="date" className="field-input" value={f.startDate} onChange={e=>set("startDate",e.target.value)}/></div><div className="field"><label className="field-label">Target End</label><input type="date" className="field-input" value={f.targetEnd} onChange={e=>set("targetEnd",e.target.value)}/></div></div><div className="btn-row"><button className="btn btn-secondary" onClick={onCancel}>Cancel</button><button className="btn btn-primary" onClick={()=>f.name.trim()&&onSave({...f,id:f.id||uid(),createdAt:f.createdAt||todayStr()})}>{existing?"Update":"Create Project"}</button></div></>;}
+function ProjectForm({existing,onSave,onCancel}){const[f,setF]=useState(existing||{name:"",description:"",owner:"",startDate:todayStr(),targetEnd:"",jobCode:"",color:PROJECT_COLORS[Math.floor(Math.random()*PROJECT_COLORS.length)]});const set=(k,v)=>setF(p=>({...p,[k]:v}));return<><div className="field"><label className="field-label">Project Name *</label><input className="field-input" value={f.name} onChange={e=>set("name",e.target.value)} placeholder="e.g. Q3 Internal Audit"/></div><div className="field"><label className="field-label">Description</label><textarea className="field-input" value={f.description} onChange={e=>set("description",e.target.value)}/></div><div className="grid-2"><div className="field"><label className="field-label">Stakeholder</label><input className="field-input" value={f.owner} onChange={e=>set("owner",e.target.value)}/></div><div className="field"><label className="field-label">Job Code <span style={{fontWeight:400,textTransform:"none",color:"#94A3B8"}}>(timesheet, optional)</span></label><input className="field-input" value={f.jobCode||""} onChange={e=>set("jobCode",e.target.value)} placeholder="e.g. D3002"/></div><div className="field"><label className="field-label">Color</label><div className="color-picker">{PROJECT_COLORS.map(c=><button key={c} className={"color-btn "+(f.color===c?"active":"")} style={{background:c}} onClick={()=>set("color",c)}/>)}</div></div><div className="field"><label className="field-label">Start Date</label><input type="date" className="field-input" value={f.startDate} onChange={e=>set("startDate",e.target.value)}/></div><div className="field"><label className="field-label">Target End</label><input type="date" className="field-input" value={f.targetEnd} onChange={e=>set("targetEnd",e.target.value)}/></div></div><div className="btn-row"><button className="btn btn-secondary" onClick={onCancel}>Cancel</button><button className="btn btn-primary" onClick={()=>f.name.trim()&&onSave({...f,id:f.id||uid(),createdAt:f.createdAt||todayStr()})}>{existing?"Update":"Create Project"}</button></div></>;}
 function TaskForm({task,projects,onSave,onCancel,defaultProject}){const[f,setF]=useState(task||{title:"",description:"",assignedBy:"",source:"Email",priority:"Medium",status:"Not Started",deadline:"",projectId:defaultProject||"",remarks:""});const set=(k,v)=>setF(p=>({...p,[k]:v}));return<><div className="field"><label className="field-label">Task Title *</label><input className="field-input" value={f.title} onChange={e=>set("title",e.target.value)}/></div><div className="field"><label className="field-label">Description</label><textarea className="field-input" value={f.description} onChange={e=>set("description",e.target.value)}/></div><div className="grid-2"><div className="field"><label className="field-label">Project *</label><select className="field-input" value={f.projectId} onChange={e=>set("projectId",e.target.value)}><option value="">— Select —</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div><div className="field"><label className="field-label">Assigned By</label><input className="field-input" value={f.assignedBy} onChange={e=>set("assignedBy",e.target.value)}/></div><div className="field"><label className="field-label">Source</label><select className="field-input" value={f.source} onChange={e=>set("source",e.target.value)}>{["Email","Meeting","Chat","Project Tool","Self"].map(s=><option key={s}>{s}</option>)}</select></div><div className="field"><label className="field-label">Priority</label><select className="field-input" value={f.priority} onChange={e=>set("priority",e.target.value)}>{Object.keys(PRIORITY).map(p=><option key={p}>{p}</option>)}</select></div><div className="field"><label className="field-label">Status</label><select className="field-input" value={f.status} onChange={e=>set("status",e.target.value)}>{["Not Started","In Progress","On Hold","Completed"].map(s=><option key={s}>{s}</option>)}</select></div><div className="field"><label className="field-label">Deadline</label><input type="date" className="field-input" value={f.deadline} onChange={e=>set("deadline",e.target.value)}/></div></div><div className="field"><label className="field-label">Remarks</label><textarea className="field-input" style={{minHeight:42}} value={f.remarks} onChange={e=>set("remarks",e.target.value)}/></div><div className="btn-row"><button className="btn btn-secondary" onClick={onCancel}>Cancel</button><button className="btn btn-primary" onClick={()=>f.title.trim()&&f.projectId&&onSave({...f,id:f.id||uid(),createdAt:f.createdAt||todayStr(),updatedAt:todayStr()})}>{task?"Update":"Add Task"}</button></div></>;}
+const WHIZIBLE_TASK_CODES = ["0-COORDINATION","1-BASIC STUDY","2-DRAFTING","3-VENDOR DRAWING REVIEW","4-SPECIFICATION","5-INSPECTION AND EXPEDITING","6-DESIGN AND DRAWING CHECKING","7-ENQUIRY COMM BID ANALYSIS PRC AND LOI","8-TECHNICAL BID ANALYSIS AND PROCUREMENT","9-SITE WORK","10-Quality Assurance","Holiday","Leave"];
+
 function LogForm({projects,onSave,onCancel,defaultProject}){
   const LOG_CATS = [
     { icon:"🤝", label:"Meeting / Call", templates:["Attended project review meeting with ","Team standup — discussed blockers and priorities","Client call regarding ","One-on-one with manager — reviewed progress on "], outcomes:["Action items assigned","Decisions taken, minutes shared","Follow-up scheduled","Aligned on next steps"] },
@@ -1106,7 +1176,7 @@ function LogForm({projects,onSave,onCancel,defaultProject}){
   ];
   const DURATIONS = ["15 min","30 min","45 min","1 hour","1.5 hours","2 hours","3 hours","4 hours","Half day","Full day"];
 
-  const [f,setF]=useState({date:todayStr(),activity:"",duration:"",projectId:defaultProject||"",outcome:"",category:""});
+  const [f,setF]=useState({date:todayStr(),activity:"",duration:"",projectId:defaultProject||"",outcome:"",category:"",taskCode:""});
   const [showTpl,setShowTpl]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const activeCat = LOG_CATS.find(c=>c.label===f.category);
@@ -1150,6 +1220,7 @@ function LogForm({projects,onSave,onCancel,defaultProject}){
         <input className="field-input" value={f.duration} onChange={e=>set("duration",e.target.value)} placeholder="or type custom" style={{fontSize:12}}/>
       </div>
       <div className="field"><label className="field-label">Project</label><select className="field-input" value={f.projectId} onChange={e=>set("projectId",e.target.value)}><option value="">— General —</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+      <div className="field"><label className="field-label">Task Code <span style={{fontWeight:400,textTransform:"none",color:"#94A3B8"}}>(Whizible, optional)</span></label><select className="field-input" value={f.taskCode} onChange={e=>set("taskCode",e.target.value)}><option value="">— None —</option>{WHIZIBLE_TASK_CODES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
     </div>
     <div className="field"><label className="field-label">Activity * <span style={{fontWeight:400,textTransform:"none",color:"#94A3B8"}}>(edit the template or write your own)</span></label><textarea className="field-input" style={{minHeight:65}} value={f.activity} onChange={e=>set("activity",e.target.value)} placeholder="What did you work on?"/></div>
     <div className="field"><label className="field-label">Outcome</label>
@@ -1306,7 +1377,7 @@ function App(){
 
           {subTab==="tasks"&&<><div className="filter-bar no-print"><button className="btn btn-primary" onClick={()=>{setEditItem(null);setModal("task");}}>+ New Task</button><select className="field-input" style={{maxWidth:150}} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option>All</option><option>Not Started</option><option>In Progress</option><option>On Hold</option><option>Completed</option><option>Overdue</option></select><span style={{fontSize:12,color:"#64748B",marginLeft:"auto"}}>{filteredTasks.length} task{filteredTasks.length!==1?"s":""}</span></div>{filteredTasks.length===0?<div className="card empty" style={{padding:36}}>No tasks match.</div>:filteredTasks.map(t=>{const isOv=t.status!=="Completed"&&t.deadline&&t.deadline<todayStr();return<div key={t.id} className={"task-card "+(isOv?"overdue":"")}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}><div style={{flex:1,minWidth:180}}><div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{t.title}</div>{t.description&&<div style={{fontSize:12,color:"#64748B",marginBottom:6}}>{t.description}</div>}<div style={{display:"flex",flexWrap:"wrap",gap:5,alignItems:"center"}}><Badge label={t.priority} colors={PRIORITY[t.priority]}/><Badge label={isOv?"Overdue":t.status} colors={STATUS[isOv?"Overdue":t.status]}/><span style={{fontSize:11,color:"#94A3B8"}}>via {t.source}</span></div></div><div style={{textAlign:"right",fontSize:12,color:"#64748B"}}>{t.deadline&&<div>Due: <b style={{color:isOv?"#DC2626":"#0F172A"}}>{fmtDate(t.deadline)}</b></div>}{t.assignedBy&&<div>By: {t.assignedBy}</div>}<div style={{display:"flex",gap:6,marginTop:8,justifyContent:"flex-end"}} className="no-print"><button className="btn-edit" onClick={()=>{setEditItem(t);setModal("task");}}>Edit</button><button className="btn-del" onClick={()=>deleteTask(t.id)}>Delete</button></div></div></div>{t.remarks&&<div style={{marginTop:8,padding:"7px 12px",background:"#F8FAFC",borderRadius:8,fontSize:12,color:"#64748B"}}>💬 {t.remarks}</div>}</div>;})}</>}
 
-          {subTab==="daily log"&&<><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}} className="no-print"><button className="btn btn-primary" onClick={()=>setModal("log")}>+ Add Entry</button></div><TimeDistribution logs={projLogs(activeProjectId)} />{projLogs(activeProjectId).length===0?<div className="card empty" style={{padding:36}}>No activity logged yet.</div>:projLogs(activeProjectId).map(l=>(<div key={l.id} className="log-entry"><div className="log-date">{fmtDate(l.date)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{l.activity}</div><div style={{display:"flex",gap:14,fontSize:12,color:"#64748B",marginTop:3}}>{l.duration&&<span>⏱ {l.duration}</span>}{l.category&&<span style={{background:"#F1F5F9",padding:"1px 8px",borderRadius:5,fontSize:10,fontWeight:600}}>{l.category}</span>}{l.outcome&&<span>✓ {l.outcome}</span>}</div></div><button className="btn-del no-print" onClick={()=>deleteLog(l.id)}>Delete</button></div>))}</>}
+          {subTab==="daily log"&&<><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}} className="no-print"><button className="btn btn-primary" onClick={()=>setModal("log")}>+ Add Entry</button></div><WhizibleExport logs={logs} projects={projects} /><TimeDistribution logs={projLogs(activeProjectId)} />{projLogs(activeProjectId).length===0?<div className="card empty" style={{padding:36}}>No activity logged yet.</div>:projLogs(activeProjectId).map(l=>(<div key={l.id} className="log-entry"><div className="log-date">{fmtDate(l.date)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{l.activity}</div><div style={{display:"flex",gap:14,fontSize:12,color:"#64748B",marginTop:3}}>{l.duration&&<span>⏱ {l.duration}</span>}{l.category&&<span style={{background:"#F1F5F9",padding:"1px 8px",borderRadius:5,fontSize:10,fontWeight:600}}>{l.category}</span>}{l.taskCode&&<span style={{background:"#FFF7ED",color:"#C2410C",padding:"1px 8px",borderRadius:5,fontSize:10,fontWeight:600}}>{l.taskCode}</span>}{l.outcome&&<span>✓ {l.outcome}</span>}</div></div><button className="btn-del no-print" onClick={()=>deleteLog(l.id)}>Delete</button></div>))}</>}
 
           {subTab==="milestones"&&<><div style={{marginBottom:14}} className="no-print"><button className="btn btn-primary" onClick={()=>setModal("milestone")}>+ Add Milestone</button></div>{projMilestones(activeProjectId).length===0?<div className="card empty" style={{padding:36}}>No milestones yet.</div>:projMilestones(activeProjectId).map(m=>(<div key={m.id} className="milestone-card"><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><div><div style={{fontWeight:700,fontSize:14}}>{m.title}</div>{m.targetDate&&<div style={{fontSize:12,color:"#64748B"}}>Target: {fmtDate(m.targetDate)}</div>}</div><div style={{display:"flex",gap:6,alignItems:"center"}}><Badge label={m.status} colors={STATUS[m.status]}/><button className="btn-del no-print" onClick={()=>deleteMilestone(m.id)}>Delete</button></div></div><div className="progress-bar"><div className="progress-fill" style={{width:m.progress+"%",background:m.progress===100?"#059669":m.progress>=50?"#2563EB":"#F59E0B"}}/></div><div style={{fontSize:11,color:"#94A3B8",marginTop:4}}>{m.progress}%</div>{m.notes&&<div style={{marginTop:8,padding:"7px 12px",background:"#F8FAFC",borderRadius:8,fontSize:12,color:"#64748B"}}>{m.notes}</div>}</div>))}</>}
         </>}
