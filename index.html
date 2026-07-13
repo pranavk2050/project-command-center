@@ -469,8 +469,7 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddTask, onAddLog, o
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const chatEnd = useRef(null);
-  const scrollToBottom = () => chatEnd.current?.scrollIntoView({ behavior: "smooth" });
-  useEffect(scrollToBottom, [messages]);
+  useEffect(function() { if (chatEnd.current) chatEnd.current.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const saveKey = () => {
     if (keyInput.trim() && providerPick) {
