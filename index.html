@@ -1157,17 +1157,46 @@ function App(){
   useEffect(()=>{if(authed)loadFromGH();},[authed,loadFromGH]);
   const saveToGH=useCallback(async(p,t,l,m)=>{setSyncStatus("saving");try{const data={projects:p,tasks:t,logs:l,milestones:m,lastUpdated:new Date().toISOString()};const ns=await gh.save(data,shaRef.current);shaRef.current=ns;setSyncStatus("ok");setLastSync(new Date());}catch(e){console.error(e);if(e.message&&e.message.includes("does not match"))await loadFromGH();setSyncStatus("error");}},[loadFromGH]);
 
-  const update=(setFn,key,nv)=>{setFn(nv);const s={projects,tasks,logs,milestones,[key]:nv};saveToGH(s.projects,s.tasks,s.logs,s.milestones);};
-  const addProject=p=>{update(setProjects,"projects",[...projects,p]);setModal(null);};
-  const updateProject=p=>{update(setProjects,"projects",projects.map(x=>x.id===p.id?p:x));setModal(null);setEditItem(null);};
-  const deleteProject=id=>{if(!confirm("Delete project and all data?"))return;const np=projects.filter(x=>x.id!==id),nt=tasks.filter(x=>x.projectId!==id),nl=logs.filter(x=>x.projectId!==id),nm=milestones.filter(x=>x.projectId!==id);setProjects(np);setTasks(nt);setLogs(nl);setMilestones(nm);saveToGH(np,nt,nl,nm);setView("overview");};
-  const addTask=t=>{update(setTasks,"tasks",[...tasks,t]);setModal(null);};
-  const updateTask=t=>{update(setTasks,"tasks",tasks.map(x=>x.id===t.id?t:x));setModal(null);setEditItem(null);};
-  const deleteTask=id=>update(setTasks,"tasks",tasks.filter(x=>x.id!==id));
-  const addLog=l=>{update(setLogs,"logs",[l,...logs]);setModal(null);};
-  const deleteLog=id=>update(setLogs,"logs",logs.filter(x=>x.id!==id));
-  const addMilestone=m=>{update(setMilestones,"milestones",[...milestones,m]);setModal(null);};
-  const deleteMilestone=id=>update(setMilestones,"milestones",milestones.filter(x=>x.id!==id));
+  // Queued, debounced save: prevents concurrent writes from racing and clobbering each other
+  // when multiple state changes happen quickly (e.g. AI adding 3 tasks in one turn)
+  const savingRef = useRef(false);
+  const pendingRef = useRef(false);
+  const latestDataRef = useRef({ projects, tasks, logs, milestones });
+  latestDataRef.current = { projects, tasks, logs, milestones };
+
+  const flushSave = useCallback(async () => {
+    if (savingRef.current) { pendingRef.current = true; return; }
+    savingRef.current = true;
+    const { projects: p, tasks: t, logs: l, milestones: m } = latestDataRef.current;
+    await saveToGH(p, t, l, m);
+    savingRef.current = false;
+    if (pendingRef.current) { pendingRef.current = false; flushSave(); }
+  }, [saveToGH]);
+
+  const debounceRef = useRef(null);
+  const scheduleSave = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { flushSave(); }, 500);
+  }, [flushSave]);
+
+  const skipFirstRef = useRef(true);
+  useEffect(() => {
+    if (loading) return;
+    if (skipFirstRef.current) { skipFirstRef.current = false; return; }
+    scheduleSave();
+  }, [projects, tasks, logs, milestones, loading, scheduleSave]);
+
+  // All mutations use functional setState (no stale closures) — safe to call rapidly in sequence
+  const addProject=p=>{setProjects(prev=>[...prev,p]);setModal(null);};
+  const updateProject=p=>{setProjects(prev=>prev.map(x=>x.id===p.id?p:x));setModal(null);setEditItem(null);};
+  const deleteProject=id=>{if(!confirm("Delete project and all data?"))return;setProjects(prev=>prev.filter(x=>x.id!==id));setTasks(prev=>prev.filter(x=>x.projectId!==id));setLogs(prev=>prev.filter(x=>x.projectId!==id));setMilestones(prev=>prev.filter(x=>x.projectId!==id));setView("overview");};
+  const addTask=t=>{setTasks(prev=>[...prev,t]);setModal(null);};
+  const updateTask=t=>{setTasks(prev=>prev.map(x=>x.id===t.id?t:x));setModal(null);setEditItem(null);};
+  const deleteTask=id=>setTasks(prev=>prev.filter(x=>x.id!==id));
+  const addLog=l=>{setLogs(prev=>[l,...prev]);setModal(null);};
+  const deleteLog=id=>setLogs(prev=>prev.filter(x=>x.id!==id));
+  const addMilestone=m=>{setMilestones(prev=>[...prev,m]);setModal(null);};
+  const deleteMilestone=id=>setMilestones(prev=>prev.filter(x=>x.id!==id));
 
   const activeProjectId=view.startsWith("project:")?view.split(":")[1]:null;
   const activeProject=projects.find(p=>p.id===activeProjectId);
@@ -1212,11 +1241,11 @@ function App(){
         {view==="journeymap"&&<InteractiveMindMap tree={journeyTree} title="🗺️ All Projects — Journey Mind Map" />}
 
         {view==="ai"&&<AIAssistant projects={projects} tasks={tasks} logs={logs} milestones={milestones}
-          onAddProject={p=>{update(setProjects,"projects",[...projects,p]);}}
-          onAddTask={t=>{update(setTasks,"tasks",[...tasks,t]);}}
-          onUpdateTask={t=>{update(setTasks,"tasks",tasks.map(x=>x.id===t.id?t:x));}}
-          onAddLog={l=>{update(setLogs,"logs",[l,...logs]);}}
-          onAddMilestone={m=>{update(setMilestones,"milestones",[...milestones,m]);}} />}
+          onAddProject={addProject}
+          onAddTask={t=>setTasks(prev=>[...prev,t])}
+          onUpdateTask={t=>setTasks(prev=>prev.map(x=>x.id===t.id?t:x))}
+          onAddLog={l=>setLogs(prev=>[l,...prev])}
+          onAddMilestone={m=>setMilestones(prev=>[...prev,m])} />}
 
         {activeProject&&<>
           <div className="card" style={{marginBottom:18,borderLeft:"5px solid "+activeProject.color}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}><div><div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={()=>setView("overview")} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:"#64748B",padding:0}}>←</button><h2 style={{fontSize:18,fontWeight:800}}>{activeProject.name}</h2></div>{activeProject.description&&<div style={{fontSize:13,color:"#64748B",marginTop:4,marginLeft:28}}>{activeProject.description}</div>}<div style={{fontSize:12,color:"#94A3B8",marginTop:4,marginLeft:28}}>{activeProject.owner&&<>Stakeholder: <b>{activeProject.owner}</b> &bull; </>}{fmtDate(activeProject.startDate)} → {fmtDate(activeProject.targetEnd)}</div></div><div style={{display:"flex",alignItems:"center",gap:14}} className="no-print"><div className="ring-container"><Ring pct={projProgress(activeProjectId)} size={64} stroke={6} color={activeProject.color}/><div className="ring-text" style={{fontSize:14,color:activeProject.color}}>{projProgress(activeProjectId)}%</div></div><div style={{display:"flex",flexDirection:"column",gap:4}}><button className="btn btn-secondary btn-sm" onClick={()=>{setEditItem(activeProject);setModal("project");}}>Edit</button><button className="btn btn-danger btn-sm" onClick={()=>deleteProject(activeProjectId)}>Delete</button></div></div></div><div style={{display:"flex",gap:16,marginTop:14,paddingTop:14,borderTop:"1px solid #F1F5F9",fontSize:13,color:"#475569",flexWrap:"wrap"}}><span>📋 <b>{projTasks(activeProjectId).length}</b> Tasks</span><span>✅ <b>{projTasks(activeProjectId).filter(t=>t.status==="Completed").length}</b> Done</span><span>🔄 <b>{projTasks(activeProjectId).filter(t=>t.status==="In Progress").length}</b> In Progress</span><span>📝 <b>{projLogs(activeProjectId).length}</b> Logs</span><span>🎯 <b>{projMilestones(activeProjectId).length}</b> Milestones</span></div></div>
