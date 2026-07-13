@@ -499,13 +499,20 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTas
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("ai_key") || "");
   const [keyInput, setKeyInput] = useState("");
   const [providerPick, setProviderPick] = useState("");
-  const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hi Pranav! I'm your project assistant. I can see all your data — ask me anything about your projects, tasks, time logs, or say things like \"add a task\" or \"log today's standup meeting\". What do you need?" }
-  ]);
+  const WELCOME_MSG = { role: "assistant", text: "Hi Pranav! I'm your project assistant. I can see all your data — ask me anything about your projects, tasks, time logs, or say things like \"add a task\" or \"log today's standup meeting\". What do you need?" };
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ai_chat_history");
+      if (saved) { const parsed = JSON.parse(saved); if (Array.isArray(parsed) && parsed.length) return parsed; }
+    } catch (e) {}
+    return [WELCOME_MSG];
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const chatEnd = useRef(null);
   useEffect(function() { if (chatEnd.current) chatEnd.current.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(function() { try { localStorage.setItem("ai_chat_history", JSON.stringify(messages)); } catch (e) {} }, [messages]);
+  const clearChat = () => { setMessages([WELCOME_MSG]); try { localStorage.removeItem("ai_chat_history"); } catch (e) {} };
 
   const saveKey = () => {
     if (keyInput.trim() && providerPick) {
@@ -798,6 +805,7 @@ DATA:\n${ctx}`;
           </button>
         ))}
         <span style={{ marginLeft: "auto", fontSize: 11, color: "#64748B", fontWeight: 600 }}>{providerLabel}</span>
+        <button onClick={clearChat} style={{ background: "none", border: "none", fontSize: 11, color: "#94A3B8", cursor: "pointer", fontFamily: "inherit" }}>🗑️ Clear Chat</button>
         <button onClick={clearKey} style={{ background: "none", border: "none", fontSize: 11, color: "#94A3B8", cursor: "pointer", fontFamily: "inherit" }}>🔑 Switch</button>
       </div>
 
