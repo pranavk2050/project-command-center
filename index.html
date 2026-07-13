@@ -552,8 +552,8 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTas
     const now = todayStr();
     const overdue = tasks.filter(t => t.status !== "Completed" && t.deadline && t.deadline < now);
     const inProg = tasks.filter(t => t.status === "In Progress");
-    const recentLogs = logs.slice(0, 20);
-    const ctx = `TODAY: ${now}\nPROFILE: ${PROFILE.name}, ${PROFILE.role}\n\nPROJECTS (${projects.length}):\n${projects.map(p => { const pT=tasks.filter(t=>t.projectId===p.id); const done=pT.filter(t=>t.status==="Completed").length; const pct=pT.length?Math.round(done/pT.length*100):0; return "- "+p.name+" [id:"+p.id+"] ("+pct+"% done, "+pT.length+" tasks, stakeholder: "+(p.owner||"N/A")+", deadline: "+(p.targetEnd||"N/A")+")"; }).join("\n")}\n\nALL TASKS (${tasks.length}):\n${tasks.map(t => { const proj=projects.find(p=>p.id===t.projectId); const isOv=t.status!=="Completed"&&t.deadline&&t.deadline<now; return "- ["+(isOv?"OVERDUE":t.status)+'] "'+t.title+'" | Project: '+(proj?.name||"?")+" ["+t.projectId+"] | Priority: "+t.priority+" | Deadline: "+(t.deadline||"none")+" | By: "+(t.assignedBy||"self")+" | Source: "+t.source; }).join("\n")}\n\nOVERDUE (${overdue.length}): ${overdue.map(t=>'"'+t.title+'" ('+daysBetween(now,t.deadline)+"d late)").join(", ")||"None"}\nIN PROGRESS (${inProg.length}): ${inProg.map(t=>'"'+t.title+'"').join(", ")||"None"}\n\nMILESTONES (${milestones.length}):\n${milestones.map(m => { const proj=projects.find(p=>p.id===m.projectId); return '- "'+m.title+'" | Project: '+(proj?.name||"?")+" ["+m.projectId+"] | "+m.progress+"% | Status: "+m.status+" | Target: "+(m.targetDate||"N/A"); }).join("\n")}\n\nRECENT LOGS (last 20):\n${recentLogs.map(l => { const proj=projects.find(p=>p.id===l.projectId); return "- "+l.date+" | "+(l.duration||"?")+" | "+(l.category||"")+" | \""+l.activity+'" | Project: '+(proj?.name||"General")+" | Outcome: "+(l.outcome||"N/A"); }).join("\n")}`;
+    const recentLogs = logs.slice(0, 8);
+    const ctx = `TODAY: ${now}\nPROFILE: ${PROFILE.name}, ${PROFILE.role}\n\nPROJECTS (${projects.length}):\n${projects.map(p => { const pT=tasks.filter(t=>t.projectId===p.id); const done=pT.filter(t=>t.status==="Completed").length; const pct=pT.length?Math.round(done/pT.length*100):0; return "- "+p.name+" [id:"+p.id+"] ("+pct+"% done, "+pT.length+" tasks, stakeholder: "+(p.owner||"N/A")+", deadline: "+(p.targetEnd||"N/A")+")"; }).join("\n")}\n\nALL TASKS (${tasks.length}):\n${tasks.map(t => { const proj=projects.find(p=>p.id===t.projectId); const isOv=t.status!=="Completed"&&t.deadline&&t.deadline<now; return "- ["+(isOv?"OVERDUE":t.status)+'] "'+t.title+'" | Project: '+(proj?.name||"?")+" ["+t.projectId+"] | Priority: "+t.priority+" | Deadline: "+(t.deadline||"none")+" | By: "+(t.assignedBy||"self")+" | Source: "+t.source; }).join("\n")}\n\nOVERDUE (${overdue.length}): ${overdue.map(t=>'"'+t.title+'" ('+daysBetween(now,t.deadline)+"d late)").join(", ")||"None"}\nIN PROGRESS (${inProg.length}): ${inProg.map(t=>'"'+t.title+'"').join(", ")||"None"}\n\nMILESTONES (${milestones.length}):\n${milestones.map(m => { const proj=projects.find(p=>p.id===m.projectId); return '- "'+m.title+'" | Project: '+(proj?.name||"?")+" ["+m.projectId+"] | "+m.progress+"% | Status: "+m.status+" | Target: "+(m.targetDate||"N/A"); }).join("\n")}\n\nRECENT LOGS (last 8):\n${recentLogs.map(l => { const proj=projects.find(p=>p.id===l.projectId); return "- "+l.date+" | "+(l.duration||"?")+" | "+(l.category||"")+" | \""+l.activity+'" | Project: '+(proj?.name||"General")+" | Outcome: "+(l.outcome||"N/A"); }).join("\n")}`;
 
     return `You are Pranav Kulkarni's personal project assistant embedded in his Project Command Center dashboard. You have access to ALL his current project data below, and you have tools to create projects, tasks, logs, and milestones, and to update task status.
 
@@ -760,7 +760,10 @@ DATA:\n${ctx}`;
     };
 
     try {
-      const history = messages.slice(1).filter(m => m.role === "user" || m.role === "assistant");
+      // Only send the last few exchanges — full history resent every turn was the main cause
+      // of burning through daily token quotas fast on free tiers like Groq.
+      const fullHistory = messages.slice(1).filter(m => m.role === "user" || m.role === "assistant");
+      const history = fullHistory.slice(-8);
       let reply;
       if (provider === "anthropic") reply = await runAnthropicAgent(userText, history, onTrace);
       else if (provider === "gemini") reply = await runGeminiAgent(userText, history, onTrace);
@@ -770,7 +773,16 @@ DATA:\n${ctx}`;
       setMessages(prev => [...prev, { role: "assistant", text: reply || "Done!" }]);
     } catch (e) {
       console.error("AI error:", e);
-      setMessages(prev => [...prev, { role: "assistant", text: "⚠️ Error: " + (e.message || "Connection failed. Please check your API key and try again.") }]);
+      const msg = (e.message || "").toLowerCase();
+      let friendly;
+      if (msg.includes("rate limit") || msg.includes("quota") || msg.includes("429")) {
+        const timeMatch = (e.message || "").match(/try again in\s*([\dhms.\s]+)/i);
+        const waitText = timeMatch ? timeMatch[1].trim() : "a little while";
+        friendly = "⏳ You've hit today's free usage limit for " + providerLabel + ". It resets after " + waitText + ".\n\nQuickest fix: tap 🔑 Switch above and connect Ollama (unlimited, runs on your PC) or Gemini instead — no need to wait.";
+      } else {
+        friendly = "⚠️ Error: " + (e.message || "Connection failed. Please check your API key and try again.");
+      }
+      setMessages(prev => [...prev, { role: "assistant", text: friendly }]);
     }
     setLoading(false);
   };
