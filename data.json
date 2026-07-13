@@ -69,6 +69,16 @@
   ],
   "logs": [
     {
+      "type": "log",
+      "activity": "Standup Meeting",
+      "duration": "30 min",
+      "projectId": "mrj39rr1iu2j2",
+      "category": "Meeting / Call",
+      "outcome": "Discussed project progress and aligned on tasks",
+      "id": "mrj6vsnz8yemb",
+      "date": "2026-07-13"
+    },
+    {
       "date": "2026-07-13",
       "activity": "Attended project review meeting with Team",
       "duration": "30 min",
@@ -89,5 +99,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T12:18:34.973Z"
+  "lastUpdated": "2026-07-13T12:19:11.711Z"
 }
