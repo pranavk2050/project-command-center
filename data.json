@@ -28,7 +28,7 @@
       "assignedBy": "",
       "source": "Email",
       "priority": "High",
-      "status": "In Progress",
+      "status": "Completed",
       "deadline": "2026-07-14",
       "projectId": "mrj39rr1iu2j2",
       "remarks": "Received 20k dataset and trained on that, currently we are getting  detection on the single video from site feed. need t otest for more videos",
@@ -39,5 +39,5 @@
   ],
   "logs": [],
   "milestones": [],
-  "lastUpdated": "2026-07-13T10:48:03.465Z"
+  "lastUpdated": "2026-07-13T10:48:24.993Z"
 }
