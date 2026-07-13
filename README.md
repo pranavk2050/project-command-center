@@ -39,7 +39,8 @@ This is a genuine **agentic tool-calling** setup, not text parsing:
   - **Gemini** — `function_declarations`, response `functionCall` parts
   - **Ollama** (local) — same OpenAI-compatible format as Groq, hits `http://localhost:11434/v1/chat/completions`
 - Each `run*Agent()` function runs a loop of up to 6 steps: call the model → if it requests tool(s), execute them locally via `executeTool()` and feed results back → repeat until the model returns plain text. This lets it chain multiple actions per turn (e.g. "create a project and add 3 tasks to it").
-- Live trace bubbles (🔧 orange) show each tool call as it happens, for transparency.
+- Live trace bubbles (🔧 orange) show each tool call as it happens, for transparency — **this is the reliable signal that an action actually happened**. If a reply claims success with no trace bubble above it, don't trust it (see "Known gotchas" #5 below).
+- **Context sent per message is capped to control token usage**: last 8 chat messages (not the full growing thread) + last 8 activity log entries (not all of them). Full task/project/milestone data is still always included since that's usually small. This was tightened after hitting Groq's free daily quota (100k TPD) — resending the entire conversation history on every single message was the main cost driver, since cost compounds as a conversation grows.
 
 ### Architecture diagram
 
@@ -94,6 +95,8 @@ This is a genuine **agentic tool-calling** setup, not text parsing:
 2. **AI action race condition** — multiple rapid state changes (e.g. AI adding 3 tasks) each triggering an immediate GitHub save caused conflicting writes and data loss on reload. Fixed via functional `setState` + debounced/queued single save (see Data storage architecture above). **Do not** go back to computing `[...tasks, newItem]` from a closure variable — always use the functional updater form.
 3. **AI output format inconsistency** — different models (especially Groq/Llama) don't reliably follow custom XML-tag instructions for "actions." This is why we moved to **native tool-calling APIs** instead of asking the model to output `<action>{...}</action>` text — much more reliable.
 4. **Gemini quota "limit: 0"** — not a bug in our code; means the Google account's free tier isn't activated. Fix on the user's end: visit aistudio.google.com and send one message there first.
+5. **AI narrating a fake success without calling the tool** — smaller/free models (seen on Groq/Llama) sometimes write convincing confirmation text ("Project X has been created, ID: ...") without actually invoking the tool. The tell: no 🔧 trace bubble appears before the claim. Fixed two ways: (a) system prompt now has an explicit rule forbidding claiming an action without a real tool call behind it, and (b) client-side safety net in `sendMessage()` — a `toolCallCount` is tracked per turn, and if the final reply matches "claims an action" language (regex for phrases like "has been created/added/updated") while `toolCallCount === 0`, the app appends a warning telling the user nothing was actually saved. Don't remove this check even if it seems redundant with the prompt rule — the prompt rule alone isn't 100% reliable on weaker models.
+6. **Token quota burned fast from resending full chat history** — because AI chat history persists (see "Data storage architecture"), sending the *entire* thread on every message meant token cost grew with every turn of a conversation, not just with data size. Fixed by capping history to the last 8 messages and recent logs to the last 8 entries before building each request (see `sendMessage()` and `buildSystemPrompt()`). If usage-per-message needs to shrink further, this is the first place to trim more aggressively.
 
 ## For a future Claude conversation
 
