@@ -547,7 +547,7 @@ DATA:\n${ctx}`;
     contents.push({ role: "user", parts: [{ text: userText }] });
     // Gemini requires first message to be user role
     if (contents.length > 0 && contents[0].role !== "user") contents.shift();
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ system_instruction: { parts: [{ text: sysPrompt }] }, contents })
@@ -629,7 +629,7 @@ DATA:\n${ctx}`;
               <div style={{ fontSize: 28, marginBottom: 6 }}>✨</div>
               <div style={{ fontWeight: 800, fontSize: 14, color: "#059669" }}>Google Gemini</div>
               <div style={{ fontSize: 11, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE</div>
-              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Gemini 2.0 Flash</div>
+              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Gemini 1.5 Flash</div>
             </button>
             <button onClick={() => setProviderPick("anthropic")} style={{
               padding: "16px 24px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 200, textAlign: "center", transition: "all .15s",
@@ -684,12 +684,12 @@ DATA:\n${ctx}`;
                 maxWidth: "80%", padding: "10px 16px", borderRadius: 14,
                 background: m.role === "user" ? "#1E3A5F" : "#F1F5F9",
                 color: m.role === "user" ? "#fff" : "#0F172A",
-                fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap",
+                fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word",
                 borderBottomRightRadius: m.role === "user" ? 4 : 14,
                 borderBottomLeftRadius: m.role === "user" ? 14 : 4
               }}>
                 {m.role === "assistant" && <div style={{ fontSize: 10, fontWeight: 700, color: "#64748B", marginBottom: 4 }}>🤖 Assistant</div>}
-                {m.text}
+                {String(m.text || "")}
               </div>
             </div>
           ))}
