@@ -53,6 +53,21 @@
     },
     {
       "type": "task",
+      "title": "Integrate order of precedence, generic instructions, parties and updated prompts",
+      "projectId": "newprojectid",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "2026-07-17",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "id": "mrj785k3osn9w",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13",
+      "description": "",
+      "remarks": ""
+    },
+    {
+      "type": "task",
       "title": "Initiate Project",
       "projectId": "mrj39rr3iu2j3",
       "priority": "Low",
@@ -69,13 +84,13 @@
     {
       "type": "task",
       "title": "Integrate order of precedence, generic instructions, parties and updated prompts",
-      "projectId": "newprojectid",
+      "projectId": "mrj39rr3iu2j4",
       "priority": "High",
       "status": "Not Started",
       "deadline": "2026-07-17",
       "assignedBy": "Pranav Kulkarni",
       "source": "Self",
-      "id": "mrj785k3osn9w",
+      "id": "mrj79l9mlit86",
       "createdAt": "2026-07-13",
       "updatedAt": "2026-07-13",
       "description": "",
@@ -114,5 +129,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T12:28:48.291Z"
+  "lastUpdated": "2026-07-13T12:29:55.306Z"
 }
