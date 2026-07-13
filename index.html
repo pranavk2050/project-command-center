@@ -539,22 +539,23 @@ DATA:\n${ctx}`;
   const callGemini = async (userText, history) => {
     const sysPrompt = buildSystemPrompt();
     const contents = [];
+    // Embed system prompt as first user context for max compatibility
+    contents.push({ role: "user", parts: [{ text: "SYSTEM CONTEXT:\n" + sysPrompt + "\n\nAcknowledge you have this data and are ready to help." }] });
+    contents.push({ role: "model", parts: [{ text: "I have all your project data loaded. Ready to help, Pranav!" }] });
     history.forEach(m => {
       if (m.role === "user") contents.push({ role: "user", parts: [{ text: m.text }] });
       else if (m.role === "assistant") contents.push({ role: "model", parts: [{ text: m.text }] });
     });
     contents.push({ role: "user", parts: [{ text: userText }] });
-    // Gemini requires first message to be user role
-    if (contents.length > 0 && contents[0].role !== "user") contents.shift();
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey, {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ system_instruction: { parts: [{ text: sysPrompt }] }, contents })
+      body: JSON.stringify({ contents })
     });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Gemini API error: " + r.status); }
     const data = await r.json();
     const parts = data.candidates?.[0]?.content?.parts;
-    if (!parts || !parts.length) throw new Error("Empty response from Gemini. Try a different question.");
+    if (!parts || !parts.length) throw new Error("Empty response from Gemini.");
     return parts.map(p => p.text || "").join("");
   };
 
@@ -628,7 +629,7 @@ DATA:\n${ctx}`;
               <div style={{ fontSize: 28, marginBottom: 6 }}>✨</div>
               <div style={{ fontWeight: 800, fontSize: 14, color: "#059669" }}>Google Gemini</div>
               <div style={{ fontSize: 11, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE</div>
-              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Gemini 1.5 Flash</div>
+              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Gemini 2.0 Flash</div>
             </button>
             <button onClick={() => setProviderPick("anthropic")} style={{
               padding: "16px 24px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 200, textAlign: "center", transition: "all .15s",
