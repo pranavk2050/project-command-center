@@ -459,8 +459,10 @@ function InteractiveMindMap({ tree, title }) {
 
 /* ═══ AI ASSISTANT AGENT ═══ */
 function AIAssistant({ projects, tasks, logs, milestones, onAddTask, onAddLog, onAddMilestone }) {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("anthropic_key") || "");
+  const [provider, setProvider] = useState(() => localStorage.getItem("ai_provider") || "");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("ai_key") || "");
   const [keyInput, setKeyInput] = useState("");
+  const [providerPick, setProviderPick] = useState("");
   const [messages, setMessages] = useState([
     { role: "assistant", text: "Hi Pranav! I'm your project assistant. I can see all your data — ask me anything about your projects, tasks, time logs, or say things like \"add a task\" or \"log today's standup meeting\". What do you need?" }
   ]);
@@ -470,8 +472,18 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddTask, onAddLog, o
   const scrollToBottom = () => chatEnd.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(scrollToBottom, [messages]);
 
-  const saveKey = () => { if (keyInput.trim()) { localStorage.setItem("anthropic_key", keyInput.trim()); setApiKey(keyInput.trim()); } };
-  const clearKey = () => { localStorage.removeItem("anthropic_key"); setApiKey(""); setKeyInput(""); };
+  const saveKey = () => {
+    if (keyInput.trim() && providerPick) {
+      localStorage.setItem("ai_key", keyInput.trim());
+      localStorage.setItem("ai_provider", providerPick);
+      setApiKey(keyInput.trim());
+      setProvider(providerPick);
+    }
+  };
+  const clearKey = () => {
+    localStorage.removeItem("ai_key"); localStorage.removeItem("ai_provider");
+    setApiKey(""); setProvider(""); setKeyInput(""); setProviderPick("");
+  };
 
   const QUICK = [
     "What should I focus on today?",
@@ -482,88 +494,82 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddTask, onAddLog, o
     "Log today's standup meeting"
   ];
 
-  const buildContext = () => {
+  const buildSystemPrompt = () => {
     const now = todayStr();
     const overdue = tasks.filter(t => t.status !== "Completed" && t.deadline && t.deadline < now);
     const inProg = tasks.filter(t => t.status === "In Progress");
     const recentLogs = logs.slice(0, 20);
-    return `TODAY: ${now}
-PROFILE: ${PROFILE.name}, ${PROFILE.role}
+    const ctx = `TODAY: ${now}\nPROFILE: ${PROFILE.name}, ${PROFILE.role}\n\nPROJECTS (${projects.length}):\n${projects.map(p => { const pT=tasks.filter(t=>t.projectId===p.id); const done=pT.filter(t=>t.status==="Completed").length; const pct=pT.length?Math.round(done/pT.length*100):0; return "- "+p.name+" [id:"+p.id+"] ("+pct+"% done, "+pT.length+" tasks, stakeholder: "+(p.owner||"N/A")+", deadline: "+(p.targetEnd||"N/A")+")"; }).join("\n")}\n\nALL TASKS (${tasks.length}):\n${tasks.map(t => { const proj=projects.find(p=>p.id===t.projectId); const isOv=t.status!=="Completed"&&t.deadline&&t.deadline<now; return "- ["+(isOv?"OVERDUE":t.status)+'] "'+t.title+'" | Project: '+(proj?.name||"?")+" ["+t.projectId+"] | Priority: "+t.priority+" | Deadline: "+(t.deadline||"none")+" | By: "+(t.assignedBy||"self")+" | Source: "+t.source; }).join("\n")}\n\nOVERDUE (${overdue.length}): ${overdue.map(t=>'"'+t.title+'" ('+daysBetween(now,t.deadline)+"d late)").join(", ")||"None"}\nIN PROGRESS (${inProg.length}): ${inProg.map(t=>'"'+t.title+'"').join(", ")||"None"}\n\nMILESTONES (${milestones.length}):\n${milestones.map(m => { const proj=projects.find(p=>p.id===m.projectId); return '- "'+m.title+'" | Project: '+(proj?.name||"?")+" ["+m.projectId+"] | "+m.progress+"% | Status: "+m.status+" | Target: "+(m.targetDate||"N/A"); }).join("\n")}\n\nRECENT LOGS (last 20):\n${recentLogs.map(l => { const proj=projects.find(p=>p.id===l.projectId); return "- "+l.date+" | "+(l.duration||"?")+" | "+(l.category||"")+" | \""+l.activity+'" | Project: '+(proj?.name||"General")+" | Outcome: "+(l.outcome||"N/A"); }).join("\n")}`;
 
-PROJECTS (${projects.length}):
-${projects.map(p => {
-  const pT = tasks.filter(t => t.projectId === p.id);
-  const done = pT.filter(t => t.status === "Completed").length;
-  const pct = pT.length ? Math.round(done / pT.length * 100) : 0;
-  return `- ${p.name} (${pct}% done, ${pT.length} tasks, stakeholder: ${p.owner || "N/A"}, deadline: ${p.targetEnd || "N/A"})`;
-}).join("\n")}
+    return `You are Pranav Kulkarni's personal project assistant embedded in his Project Command Center dashboard. You have access to ALL his current project data below.
 
-ALL TASKS (${tasks.length}):
-${tasks.map(t => {
-  const proj = projects.find(p => p.id === t.projectId);
-  const isOv = t.status !== "Completed" && t.deadline && t.deadline < now;
-  return `- [${isOv ? "OVERDUE" : t.status}] "${t.title}" | Project: ${proj?.name || "?"} | Priority: ${t.priority} | Deadline: ${t.deadline || "none"} | By: ${t.assignedBy || "self"} | Source: ${t.source}`;
-}).join("\n")}
+RULES:
+- Be concise and direct. Use short paragraphs, not long essays.
+- When asked analytical questions, reference specific data (project names, task counts, dates).
+- When asked to add a task/log/milestone, respond with a JSON action block wrapped in <action> tags. Use the project ID from the data.
+- For task: <action>{"type":"task","title":"...","projectId":"...","priority":"High/Medium/Low","status":"Not Started","deadline":"YYYY-MM-DD","assignedBy":"...","source":"Email/Meeting/Chat/Self"}</action>
+- For log: <action>{"type":"log","activity":"...","duration":"...","projectId":"...","category":"Meeting / Call|Task Progress|Email / Follow-up|Review / Approval|Problem Solving|Coordination|Learning / Training|Reporting / MIS","outcome":"..."}</action>
+- For milestone: <action>{"type":"milestone","title":"...","projectId":"...","targetDate":"YYYY-MM-DD","status":"Not Started","progress":0}</action>
+- Always confirm after adding: "Done! I've added..."
+- If user mentions a project name, match it to the project ID from the data.
+- For weekly summaries, give a structured brief: tasks completed, in progress, overdue, key activity, recommendations.
+- Be encouraging but professional. This data may be shown to senior leadership.
 
-OVERDUE (${overdue.length}): ${overdue.map(t => `"${t.title}" (${daysBetween(now, t.deadline)}d late)`).join(", ") || "None"}
-IN PROGRESS (${inProg.length}): ${inProg.map(t => `"${t.title}"`).join(", ") || "None"}
+DATA:\n${ctx}`;
+  };
 
-MILESTONES (${milestones.length}):
-${milestones.map(m => {
-  const proj = projects.find(p => p.id === m.projectId);
-  return `- "${m.title}" | Project: ${proj?.name || "?"} | ${m.progress}% | Status: ${m.status} | Target: ${m.targetDate || "N/A"}`;
-}).join("\n")}
+  const callAnthropic = async (allMsgs) => {
+    const sysPrompt = buildSystemPrompt();
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6", max_tokens: 1000, system: sysPrompt,
+        messages: allMsgs.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.text }))
+      })
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error.message || "Anthropic API error");
+    return data.content?.map(c => c.text || "").join("") || "No response.";
+  };
 
-RECENT ACTIVITY LOG (last 20):
-${recentLogs.map(l => {
-  const proj = projects.find(p => p.id === l.projectId);
-  return `- ${l.date} | ${l.duration || "?"} | ${l.category || ""} | "${l.activity}" | Project: ${proj?.name || "General"} | Outcome: ${l.outcome || "N/A"}`;
-}).join("\n")}`;
+  const callGemini = async (allMsgs) => {
+    const sysPrompt = buildSystemPrompt();
+    const contents = allMsgs.map(m => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.text }]
+    }));
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: sysPrompt }] },
+        contents: contents
+      })
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error.message || "Gemini API error");
+    return data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "No response.";
   };
 
   const sendMessage = async (text) => {
     if (!text.trim()) return;
     const userMsg = { role: "user", text: text.trim() };
+    const newMsgs = [...messages.slice(1), userMsg]; // skip welcome msg for API
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system: `You are Pranav Kulkarni's personal project assistant embedded in his Project Command Center dashboard. You have access to ALL his current project data below.
-
-RULES:
-- Be concise and direct. Use short paragraphs, not long essays.
-- When asked analytical questions, reference specific data (project names, task counts, dates).
-- When asked to add a task/log/milestone, respond with a JSON action block wrapped in <action> tags.
-- For task: <action>{"type":"task","title":"...","projectId":"...","priority":"High/Medium/Low","status":"Not Started","deadline":"YYYY-MM-DD","assignedBy":"...","source":"Email/Meeting/Chat/Self"}</action>
-- For log: <action>{"type":"log","activity":"...","duration":"...","projectId":"...","category":"Meeting / Call|Task Progress|Email / Follow-up|Review / Approval|Problem Solving|Coordination|Learning / Training|Reporting / MIS","outcome":"..."}</action>
-- For milestone: <action>{"type":"milestone","title":"...","projectId":"...","targetDate":"YYYY-MM-DD","status":"Not Started","progress":0}</action>
-- Always confirm after adding: "Done! I've added..."
-- If a project name is mentioned but you need the ID, match it from the data.
-- For weekly summaries, give a structured brief: tasks completed, in progress, overdue, key activity, recommendations.
-- Be encouraging but professional. This data may be shown to senior leadership.
-
-DATA:
-${buildContext()}`,
-          messages: messages.filter(m => m.role !== "assistant" || messages.indexOf(m) > 0).concat([userMsg]).map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.text }))
-        })
-      });
-
-      const data = await response.json();
-      let reply = data.content?.map(c => c.text || "").join("") || "Sorry, I couldn't process that. Try again.";
+      let reply;
+      if (provider === "anthropic") reply = await callAnthropic(newMsgs);
+      else reply = await callGemini(newMsgs);
 
       // Parse actions
       const actionMatch = reply.match(/<action>([\s\S]*?)<\/action>/);
       if (actionMatch) {
         try {
           const action = JSON.parse(actionMatch[1]);
-          // Match project by name if needed
           if (action.projectName && !action.projectId) {
             const match = projects.find(p => p.name.toLowerCase().includes(action.projectName.toLowerCase()));
             if (match) action.projectId = match.id;
@@ -578,36 +584,68 @@ ${buildContext()}`,
         } catch (e) { console.error("Action parse error:", e); }
         reply = reply.replace(/<action>[\s\S]*?<\/action>/, "").trim();
       }
-
       setMessages(prev => [...prev, { role: "assistant", text: reply }]);
     } catch (e) {
       console.error("AI error:", e);
-      setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong connecting to the AI. Please try again." }]);
+      setMessages(prev => [...prev, { role: "assistant", text: "Error: " + (e.message || "Connection failed. Check your API key and try again.") }]);
     }
     setLoading(false);
   };
+
+  const isConnected = provider && apiKey;
+  const providerLabel = provider === "gemini" ? "🟢 Gemini Flash (Free)" : provider === "anthropic" ? "🟣 Claude Sonnet" : "";
 
   return (
     <div>
       <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>🤖 AI Project Assistant</h2>
 
-      {/* API Key Setup */}
-      {!apiKey ? (
-        <div className="card" style={{ textAlign: "center", padding: "40px 30px", marginBottom: 16 }}>
+      {!isConnected ? (
+        <div className="card" style={{ textAlign: "center", padding: "40px 30px" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🤖</div>
           <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Connect AI Assistant</h3>
           <p style={{ color: "#64748B", fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>
-            Enter your Anthropic API key to enable the AI assistant. It stays in this browser only — never sent anywhere except Anthropic's API.
+            Choose your AI provider and enter the API key. It stays in this browser only.
           </p>
-          <div style={{ display: "flex", gap: 8, maxWidth: 420, margin: "0 auto" }}>
-            <input className="field-input" value={keyInput} onChange={e => setKeyInput(e.target.value)}
-              placeholder="sk-ant-api03-xxxxxxxxxxxx" style={{ flex: 1, fontSize: 13, textAlign: "center" }}
-              onKeyDown={e => { if (e.key === "Enter") saveKey(); }} />
-            <button className="btn btn-primary" onClick={saveKey}>Connect</button>
+
+          {/* Provider selection */}
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 20 }}>
+            <button onClick={() => setProviderPick("gemini")} style={{
+              padding: "16px 24px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 200, textAlign: "center", transition: "all .15s",
+              background: providerPick === "gemini" ? "#F0FDF4" : "#fff",
+              border: providerPick === "gemini" ? "2px solid #22C55E" : "2px solid #E2E8F0"
+            }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>✨</div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: "#059669" }}>Google Gemini</div>
+              <div style={{ fontSize: 11, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE</div>
+              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Gemini 2.0 Flash</div>
+            </button>
+            <button onClick={() => setProviderPick("anthropic")} style={{
+              padding: "16px 24px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 200, textAlign: "center", transition: "all .15s",
+              background: providerPick === "anthropic" ? "#F5F3FF" : "#fff",
+              border: providerPick === "anthropic" ? "2px solid #7C3AED" : "2px solid #E2E8F0"
+            }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>🟣</div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: "#7C3AED" }}>Anthropic Claude</div>
+              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, marginTop: 2 }}>PAID</div>
+              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Claude Sonnet 4.6</div>
+            </button>
           </div>
-          <p style={{ color: "#94A3B8", fontSize: 11, marginTop: 14 }}>
-            Get your key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style={{ color: "#2563EB" }}>console.anthropic.com → API Keys</a>
-          </p>
+
+          {providerPick && <>
+            <div style={{ display: "flex", gap: 8, maxWidth: 440, margin: "0 auto", marginBottom: 12 }}>
+              <input className="field-input" value={keyInput} onChange={e => setKeyInput(e.target.value)}
+                placeholder={providerPick === "gemini" ? "AIzaSy... (from Google AI Studio)" : "sk-ant-api03-... (from Anthropic Console)"}
+                style={{ flex: 1, fontSize: 12, textAlign: "center" }}
+                onKeyDown={e => { if (e.key === "Enter") saveKey(); }} />
+              <button className="btn btn-primary" onClick={saveKey}>Connect</button>
+            </div>
+            <p style={{ color: "#94A3B8", fontSize: 11 }}>
+              {providerPick === "gemini"
+                ? <>Get free key: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style={{ color: "#059669" }}>aistudio.google.com → Get API Key</a> (no credit card needed)</>
+                : <>Get key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style={{ color: "#7C3AED" }}>console.anthropic.com → API Keys</a></>
+              }
+            </p>
+          </>}
         </div>
       ) : (<>
 
@@ -621,7 +659,8 @@ ${buildContext()}`,
             {q}
           </button>
         ))}
-        <button onClick={clearKey} style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 11, color: "#94A3B8", cursor: "pointer", fontFamily: "inherit" }}>🔑 Change API Key</button>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "#64748B", fontWeight: 600 }}>{providerLabel}</span>
+        <button onClick={clearKey} style={{ background: "none", border: "none", fontSize: 11, color: "#94A3B8", cursor: "pointer", fontFamily: "inherit" }}>🔑 Switch</button>
       </div>
 
       {/* Chat area */}
