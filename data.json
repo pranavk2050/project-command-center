@@ -121,6 +121,62 @@
       "updatedAt": "2026-07-13"
     },
     {
+      "id": "mrjgpev1w8km9",
+      "title": "Create Technical Document for Architecture",
+      "description": "",
+      "assignedBy": "",
+      "source": "Self",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "2026-07-16",
+      "projectId": "mrj3bl7yk558j",
+      "remarks": "",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13"
+    },
+    {
+      "id": "mrjgx6gvlrwix",
+      "title": "Create Technical Document for Architecture",
+      "description": "",
+      "assignedBy": "",
+      "source": "Self",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "",
+      "projectId": "mrj3bl7yk558j",
+      "remarks": "",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13"
+    },
+    {
+      "id": "mrjgx6gv9wnkp",
+      "title": "Implement Testing Plan for System",
+      "description": "",
+      "assignedBy": "",
+      "source": "Self",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "",
+      "projectId": "mrj3bl7yk558j",
+      "remarks": "",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13"
+    },
+    {
+      "id": "mrjgx6gvbb2em",
+      "title": "Plan Deployment Strategy and Schedule",
+      "description": "",
+      "assignedBy": "",
+      "source": "Self",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "",
+      "projectId": "mrj3bl7yk558j",
+      "remarks": "",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13"
+    },
+    {
       "type": "task",
       "title": "Initiate Project",
       "projectId": "mrj39rr3iu2j3",
@@ -134,20 +190,6 @@
       "updatedAt": "2026-07-13",
       "description": "",
       "remarks": ""
-    },
-    {
-      "id": "mrjgpev1w8km9",
-      "title": "Create Technical Document for Architecture",
-      "description": "",
-      "assignedBy": "",
-      "source": "Self",
-      "priority": "High",
-      "status": "Not Started",
-      "deadline": "2026-07-16",
-      "projectId": "mrj3bl7yk558j",
-      "remarks": "",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13"
     }
   ],
   "logs": [
@@ -182,5 +224,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T16:54:10.045Z"
+  "lastUpdated": "2026-07-13T17:00:13.612Z"
 }
