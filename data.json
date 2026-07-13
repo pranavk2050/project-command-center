@@ -38,6 +38,16 @@
     }
   ],
   "logs": [],
-  "milestones": [],
-  "lastUpdated": "2026-07-13T10:48:24.993Z"
+  "milestones": [
+    {
+      "title": "Visual representation of safety zone area violation form operator in plant",
+      "projectId": "mrj39rr1iu2j2",
+      "targetDate": "2026-07-17",
+      "status": "In Progress",
+      "progress": 60,
+      "notes": "",
+      "id": "mrj4jzqftn9jw"
+    }
+  ],
+  "lastUpdated": "2026-07-13T11:14:01.767Z"
 }
