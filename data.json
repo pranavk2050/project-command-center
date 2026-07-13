@@ -59,6 +59,16 @@
       "targetEnd": "2026-12-31",
       "color": "#15803D",
       "createdAt": "2026-07-13"
+    },
+    {
+      "id": "mrjj1jnsr9qxf",
+      "name": "Digital Twin Data Center",
+      "description": "Developing a digital twin for the data center infrastructure.",
+      "owner": "Pranav Kulkarni",
+      "startDate": "2026-07-13",
+      "targetEnd": "2026-12-31",
+      "color": "#7C3AED",
+      "createdAt": "2026-07-13"
     }
   ],
   "tasks": [
@@ -211,5 +221,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T17:33:31.117Z"
+  "lastUpdated": "2026-07-13T17:59:35.874Z"
 }
