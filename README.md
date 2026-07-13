@@ -41,6 +41,45 @@ This is a genuine **agentic tool-calling** setup, not text parsing:
 - Each `run*Agent()` function runs a loop of up to 6 steps: call the model → if it requests tool(s), execute them locally via `executeTool()` and feed results back → repeat until the model returns plain text. This lets it chain multiple actions per turn (e.g. "create a project and add 3 tasks to it").
 - Live trace bubbles (🔧 orange) show each tool call as it happens, for transparency.
 
+### Architecture diagram
+
+```
+                 ┌────────────────────┐
+                 │    User message    │
+                 └──────────┬─────────┘
+                            │
+                            ▼
+                 ┌────────────────────────────┐
+                 │    Agent orchestrator       │
+                 │  Loads data + tool schemas  │
+                 └──────────┬─────────────────┘
+                            │
+                            ▼
+                 ┌────────────────────────────────┐
+                 │      LLM provider call          │
+                 │ Groq · Gemini · Anthropic ·     │
+                 │           Ollama                │
+                 └──────────┬─────────────────────┘
+                            │
+                            ▼
+                 ┌────────────────────────┐
+                 │  Tool call requested?  │
+                 └──────┬───────────┬─────┘
+                    yes │           │ no
+                        ▼           ▼
+           ┌────────────────────┐ ┌──────────────────┐
+           │   Execute tool      │ │   Final answer    │
+           │ Updates dashboard   │ │  Shown in chat     │
+           │      data           │ └──────────────────┘
+           └──────────┬──────────┘
+                      │
+                      │ tool result feeds back
+                      └──────────────► (loop back to "LLM provider call",
+                                        up to 6 iterations per turn)
+```
+
+**Flow in words:** every message rebuilds the full data context + tool schemas from scratch (no persistent server-side memory), sends it to whichever provider is connected, and loops — execute tool → feed result back → call model again — until the model has nothing left to do and returns plain text. This is what makes it "agentic" rather than single-shot Q&A: the model can chain multiple real actions (create a project, then several tasks under it, then a milestone) within one user turn, observing each result before deciding the next step.
+
 ### Provider options (user picks one, stored per-browser)
 | Provider | Cost | Notes |
 |---|---|---|
