@@ -39,6 +39,26 @@
       "targetEnd": "2026-12-31",
       "color": "#0891B2",
       "createdAt": "2026-07-13"
+    },
+    {
+      "id": "mrjhtg9zgz5by",
+      "name": "P&ID Digitization",
+      "description": "",
+      "owner": "Pranav Kulkarni",
+      "startDate": "2026-07-13",
+      "targetEnd": "2026-12-31",
+      "color": "#4F46E5",
+      "createdAt": "2026-07-13"
+    },
+    {
+      "id": "mrjhtg9zgrxoz",
+      "name": "Tech-Hive Upgradation and Migration",
+      "description": "",
+      "owner": "Pranav Kulkarni",
+      "startDate": "2026-07-13",
+      "targetEnd": "2026-12-31",
+      "color": "#0891B2",
+      "createdAt": "2026-07-13"
     }
   ],
   "tasks": [
@@ -191,5 +211,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T17:24:16.734Z"
+  "lastUpdated": "2026-07-13T17:25:18.622Z"
 }
