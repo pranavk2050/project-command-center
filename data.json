@@ -48,21 +48,6 @@
     },
     {
       "type": "task",
-      "title": "Create Technical Document for Architecture",
-      "projectId": "mrj3bl7yk558j",
-      "priority": "High",
-      "status": "Not Started",
-      "deadline": "2026-07-16",
-      "assignedBy": "Pranav Kulkarni",
-      "source": "Self",
-      "id": "mrj6p32js2n8y",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13",
-      "description": "",
-      "remarks": ""
-    },
-    {
-      "type": "task",
       "title": "Integrate order of precedence, generic instructions, parties and updated prompts",
       "projectId": "newprojectid",
       "priority": "High",
@@ -224,5 +209,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T17:00:13.612Z"
+  "lastUpdated": "2026-07-13T17:00:38.832Z"
 }
