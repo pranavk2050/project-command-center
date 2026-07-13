@@ -518,54 +518,65 @@ RULES:
 DATA:\n${ctx}`;
   };
 
-  const callAnthropic = async (allMsgs) => {
+  const callAnthropic = async (userText, history) => {
     const sysPrompt = buildSystemPrompt();
+    const apiMsgs = [];
+    history.forEach(m => {
+      if (m.role === "user" || m.role === "assistant") {
+        apiMsgs.push({ role: m.role, content: m.text });
+      }
+    });
+    apiMsgs.push({ role: "user", content: userText });
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6", max_tokens: 1000, system: sysPrompt,
-        messages: allMsgs.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.text }))
-      })
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, system: sysPrompt, messages: apiMsgs })
     });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Anthropic API error: " + r.status); }
     const data = await r.json();
-    if (data.error) throw new Error(data.error.message || "Anthropic API error");
-    return data.content?.map(c => c.text || "").join("") || "No response.";
+    return (data.content || []).map(c => c.text || "").join("") || "No response received.";
   };
 
-  const callGemini = async (allMsgs) => {
+  const callGemini = async (userText, history) => {
     const sysPrompt = buildSystemPrompt();
-    const contents = allMsgs.map(m => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.text }]
-    }));
+    const contents = [];
+    history.forEach(m => {
+      if (m.role === "user") contents.push({ role: "user", parts: [{ text: m.text }] });
+      else if (m.role === "assistant") contents.push({ role: "model", parts: [{ text: m.text }] });
+    });
+    contents.push({ role: "user", parts: [{ text: userText }] });
+    // Gemini requires first message to be user role
+    if (contents.length > 0 && contents[0].role !== "user") contents.shift();
     const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: sysPrompt }] },
-        contents: contents
-      })
+      body: JSON.stringify({ system_instruction: { parts: [{ text: sysPrompt }] }, contents })
     });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Gemini API error: " + r.status); }
     const data = await r.json();
-    if (data.error) throw new Error(data.error.message || "Gemini API error");
-    return data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "No response.";
+    const parts = data.candidates?.[0]?.content?.parts;
+    if (!parts || !parts.length) throw new Error("Empty response from Gemini. Try a different question.");
+    return parts.map(p => p.text || "").join("");
   };
 
   const sendMessage = async (text) => {
-    if (!text.trim()) return;
-    const userMsg = { role: "user", text: text.trim() };
-    const newMsgs = [...messages.slice(1), userMsg]; // skip welcome msg for API
-    setMessages(prev => [...prev, userMsg]);
+    if (!text.trim() || loading) return;
+    const userText = text.trim();
+    setMessages(prev => [...prev, { role: "user", text: userText }]);
     setInput("");
     setLoading(true);
 
     try {
+      // Build clean history (skip the initial welcome message)
+      const history = messages.slice(1).filter(m => m.role === "user" || m.role === "assistant");
       let reply;
-      if (provider === "anthropic") reply = await callAnthropic(newMsgs);
-      else reply = await callGemini(newMsgs);
+      if (provider === "anthropic") {
+        reply = await callAnthropic(userText, history);
+      } else {
+        reply = await callGemini(userText, history);
+      }
 
-      // Parse actions
+      // Parse actions from reply
       const actionMatch = reply.match(/<action>([\s\S]*?)<\/action>/);
       if (actionMatch) {
         try {
@@ -582,12 +593,13 @@ DATA:\n${ctx}`;
             onAddMilestone({ ...action, id: uid(), notes: "" });
           }
         } catch (e) { console.error("Action parse error:", e); }
-        reply = reply.replace(/<action>[\s\S]*?<\/action>/, "").trim();
+        reply = reply.replace(/<action>[\s\S]*?<\/action>/g, "").trim();
       }
+      if (!reply) reply = "Done! The action has been completed.";
       setMessages(prev => [...prev, { role: "assistant", text: reply }]);
     } catch (e) {
       console.error("AI error:", e);
-      setMessages(prev => [...prev, { role: "assistant", text: "Error: " + (e.message || "Connection failed. Check your API key and try again.") }]);
+      setMessages(prev => [...prev, { role: "assistant", text: "⚠️ Error: " + (e.message || "Connection failed. Please check your API key and try again.") }]);
     }
     setLoading(false);
   };
