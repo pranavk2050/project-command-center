@@ -18,7 +18,10 @@
       "targetEnd": "2026-07-17",
       "color": "#DC2626",
       "id": "mrj3bl7yk558j",
-      "createdAt": "2026-07-13"
+      "createdAt": "2026-07-13",
+      "valueCategory": "",
+      "valueStatement": "Implementing a robust video analytics system will enhance surveillance efficiency and reduce manual monitoring effort, potentially saving significant man-hours.",
+      "valueImpact": ""
     },
     {
       "id": "mrjhtg9zgz5by",
@@ -221,5 +224,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T18:05:24.358Z"
+  "lastUpdated": "2026-07-13T18:32:58.326Z"
 }
