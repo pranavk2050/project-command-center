@@ -473,7 +473,19 @@ const AGENT_TOOLS = [
     required: ["title"] },
   { name: "update_task_status", description: "Update the status of an existing task by matching its title text.",
     properties: { taskTitle: { type: "string", description: "Exact or partial title of the task to find" }, newStatus: { type: "string", description: "Not Started, In Progress, On Hold, or Completed" } },
-    required: ["taskTitle", "newStatus"] }
+    required: ["taskTitle", "newStatus"] },
+  { name: "delete_project", description: "Delete a project and all its tasks, logs, and milestones by matching its name. Destructive — only use when the user clearly asks to delete/remove a project.",
+    properties: { projectName: { type: "string", description: "Name or partial name of the project to delete" } },
+    required: ["projectName"] },
+  { name: "delete_task", description: "Delete a single task by matching its title text. Destructive — only use when the user clearly asks to delete/remove a task.",
+    properties: { taskTitle: { type: "string", description: "Exact or partial title of the task to delete" } },
+    required: ["taskTitle"] },
+  { name: "delete_log", description: "Delete a daily log entry by matching its activity text (and optionally its date to narrow down). Destructive.",
+    properties: { activityText: { type: "string", description: "Text from the activity description" }, date: { type: "string", description: "YYYY-MM-DD, optional, narrows the match" } },
+    required: ["activityText"] },
+  { name: "delete_milestone", description: "Delete a milestone by matching its title. Destructive.",
+    properties: { milestoneTitle: { type: "string", description: "Title or partial title of the milestone to delete" } },
+    required: ["milestoneTitle"] }
 ];
 
 const anthropicToolSchema = () => AGENT_TOOLS.map(t => ({ name: t.name, description: t.description, input_schema: { type: "object", properties: t.properties, required: t.required } }));
@@ -490,11 +502,15 @@ function toolLabel(name, args) {
   if (name === "create_log") return "Logging activity: \"" + (args.activity || "").slice(0, 40) + "\"";
   if (name === "create_milestone") return "Adding milestone \"" + (args.title || "") + "\"";
   if (name === "update_task_status") return "Updating \"" + (args.taskTitle || "") + "\" → " + (args.newStatus || "");
+  if (name === "delete_project") return "Deleting project \"" + (args.projectName || "") + "\"";
+  if (name === "delete_task") return "Deleting task \"" + (args.taskTitle || "") + "\"";
+  if (name === "delete_log") return "Deleting log entry \"" + (args.activityText || "").slice(0, 30) + "\"";
+  if (name === "delete_milestone") return "Deleting milestone \"" + (args.milestoneTitle || "") + "\"";
   return "Running " + name;
 }
 
 /* ═══ AI ASSISTANT AGENT ═══ */
-function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTask, onUpdateTask, onAddLog, onAddMilestone }) {
+function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTask, onUpdateTask, onAddLog, onAddMilestone, onDeleteProject, onDeleteTask, onDeleteLog, onDeleteMilestone }) {
   const [provider, setProvider] = useState(() => localStorage.getItem("ai_provider") || "");
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("ai_key") || "");
   const [keyInput, setKeyInput] = useState("");
@@ -562,6 +578,7 @@ RULES:
 - When asked analytical questions, reference specific data (project names, task counts, dates).
 - When the user asks you to add/create/log/update something, use the appropriate tool. You may call multiple tools in sequence if the request needs it (e.g. "create a project and add 3 tasks to it").
 - CRITICAL: Never say something was created, added, updated, or logged unless you actually called the matching tool in this turn and it succeeded. Do not describe a project/task/log/milestone as done, give it an ID, or write confirmation text like "has been created" without a real tool call behind it. If you're not calling a tool, don't claim an action happened — just answer or ask a clarifying question instead.
+- Deletion tools (delete_project, delete_task, delete_log, delete_milestone) are destructive and cannot be undone from the dashboard. Only call them when the user has clearly and explicitly asked to delete/remove something — never delete proactively or as a side effect of another request. If it's unclear exactly which item they mean, ask for clarification instead of guessing.
 - Always use an existing project's id from the data when given. If the user names a project that doesn't exist yet, ask whether to create it first (or create it if that seems clearly intended).
 - After using tools, give a short natural confirmation summarizing what you did.
 - For weekly summaries or analysis questions, give a structured brief: tasks completed, in progress, overdue, key activity, recommendations — no tool needed for these.
@@ -608,6 +625,35 @@ DATA:\n${ctx}`;
         if (!match) return { success: false, message: "No task found matching '" + args.taskTitle + "'" };
         onUpdateTask({ ...match, status: args.newStatus, updatedAt: todayStr() });
         return { success: true, message: "Updated '" + match.title + "' to " + args.newStatus };
+      }
+      if (name === "delete_project") {
+        const matches = projects.filter(p => p.name.toLowerCase().includes(String(args.projectName || "").toLowerCase()));
+        if (matches.length === 0) return { success: false, message: "No project found matching '" + args.projectName + "'" };
+        if (matches.length > 1) return { success: false, message: "Multiple projects match: " + matches.map(m => m.name).join(", ") + ". Ask the user to be more specific." };
+        onDeleteProject(matches[0].id);
+        return { success: true, message: "Deleted project '" + matches[0].name + "' and all its tasks, logs, and milestones." };
+      }
+      if (name === "delete_task") {
+        const matches = tasks.filter(t => t.title.toLowerCase().includes(String(args.taskTitle || "").toLowerCase()));
+        if (matches.length === 0) return { success: false, message: "No task found matching '" + args.taskTitle + "'" };
+        if (matches.length > 1) return { success: false, message: "Multiple tasks match: " + matches.map(m => m.title).join(", ") + ". Ask the user to be more specific." };
+        onDeleteTask(matches[0].id);
+        return { success: true, message: "Deleted task '" + matches[0].title + "'" };
+      }
+      if (name === "delete_log") {
+        let candidates = logs.filter(l => l.activity.toLowerCase().includes(String(args.activityText || "").toLowerCase()));
+        if (args.date) candidates = candidates.filter(l => l.date === args.date);
+        if (candidates.length === 0) return { success: false, message: "No log entry found matching that description." };
+        if (candidates.length > 1) return { success: false, message: "Multiple log entries match. Ask the user for a date to narrow it down." };
+        onDeleteLog(candidates[0].id);
+        return { success: true, message: "Deleted log entry: '" + candidates[0].activity + "'" };
+      }
+      if (name === "delete_milestone") {
+        const matches = milestones.filter(m => m.title.toLowerCase().includes(String(args.milestoneTitle || "").toLowerCase()));
+        if (matches.length === 0) return { success: false, message: "No milestone found matching '" + args.milestoneTitle + "'" };
+        if (matches.length > 1) return { success: false, message: "Multiple milestones match: " + matches.map(m => m.title).join(", ") + ". Ask the user to be more specific." };
+        onDeleteMilestone(matches[0].id);
+        return { success: true, message: "Deleted milestone '" + matches[0].title + "'" };
       }
       return { success: false, message: "Unknown tool: " + name };
     } catch (e) {
@@ -1367,7 +1413,11 @@ function App(){
           onAddTask={t=>setTasks(prev=>[...prev,t])}
           onUpdateTask={t=>setTasks(prev=>prev.map(x=>x.id===t.id?t:x))}
           onAddLog={l=>setLogs(prev=>[l,...prev])}
-          onAddMilestone={m=>setMilestones(prev=>[...prev,m])} />}
+          onAddMilestone={m=>setMilestones(prev=>[...prev,m])}
+          onDeleteProject={id=>{setProjects(prev=>prev.filter(x=>x.id!==id));setTasks(prev=>prev.filter(x=>x.projectId!==id));setLogs(prev=>prev.filter(x=>x.projectId!==id));setMilestones(prev=>prev.filter(x=>x.projectId!==id));}}
+          onDeleteTask={id=>setTasks(prev=>prev.filter(x=>x.id!==id))}
+          onDeleteLog={id=>setLogs(prev=>prev.filter(x=>x.id!==id))}
+          onDeleteMilestone={id=>setMilestones(prev=>prev.filter(x=>x.id!==id))} />}
 
         {activeProject&&<>
           <div className="card" style={{marginBottom:18,borderLeft:"5px solid "+activeProject.color}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}><div><div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={()=>setView("overview")} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:"#64748B",padding:0}}>←</button><h2 style={{fontSize:18,fontWeight:800}}>{activeProject.name}</h2></div>{activeProject.description&&<div style={{fontSize:13,color:"#64748B",marginTop:4,marginLeft:28}}>{activeProject.description}</div>}<div style={{fontSize:12,color:"#94A3B8",marginTop:4,marginLeft:28}}>{activeProject.owner&&<>Stakeholder: <b>{activeProject.owner}</b> &bull; </>}{fmtDate(activeProject.startDate)} → {fmtDate(activeProject.targetEnd)}</div></div><div style={{display:"flex",alignItems:"center",gap:14}} className="no-print"><div className="ring-container"><Ring pct={projProgress(activeProjectId)} size={64} stroke={6} color={activeProject.color}/><div className="ring-text" style={{fontSize:14,color:activeProject.color}}>{projProgress(activeProjectId)}%</div></div><div style={{display:"flex",flexDirection:"column",gap:4}}><button className="btn btn-secondary btn-sm" onClick={()=>{setEditItem(activeProject);setModal("project");}}>Edit</button><button className="btn btn-danger btn-sm" onClick={()=>deleteProject(activeProjectId)}>Delete</button></div></div></div><div style={{display:"flex",gap:16,marginTop:14,paddingTop:14,borderTop:"1px solid #F1F5F9",fontSize:13,color:"#475569",flexWrap:"wrap"}}><span>📋 <b>{projTasks(activeProjectId).length}</b> Tasks</span><span>✅ <b>{projTasks(activeProjectId).filter(t=>t.status==="Completed").length}</b> Done</span><span>🔄 <b>{projTasks(activeProjectId).filter(t=>t.status==="In Progress").length}</b> In Progress</span><span>📝 <b>{projLogs(activeProjectId).length}</b> Logs</span><span>🎯 <b>{projMilestones(activeProjectId).length}</b> Milestones</span></div></div>
