@@ -20,6 +20,7 @@ A single self-contained `index.html` file (React + Babel loaded via CDN, no buil
 - **Time Distribution dashboard** — donut chart by category + daily bar chart, computed from log durations
 - **Interactive Mind Map** — expandable/collapsible tree view (drag to pan, scroll to zoom) for both the whole portfolio ("Journey Map") and individual projects
 - **AI Assistant** — agentic chat that can answer questions about your data AND take real actions (create_project, create_task, create_log, create_milestone, update_task_status) via native tool-calling
+- **Whizible timesheet export** — projects can carry an optional `jobCode` and log entries an optional `taskCode` (matching the company Whizible timesheet's dropdown values). The Daily Log tab has a collapsible "📤 Export for Whizible" panel: pick a date range, it generates a formatted Job/Task/Hours/Description block per day (with an 8.5hr daily-total check), ready to copy and hand to Claude in Chrome (a separate browsing-agent product) along with the user's own Whizible process notes to auto-fill the actual timesheet site. This dashboard only prepares the data — it can't drive the Whizible website itself, since that requires real browser automation outside this chat's tool access.
 
 ## Data storage architecture
 
