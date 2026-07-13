@@ -514,8 +514,20 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTas
   useEffect(function() { try { localStorage.setItem("ai_chat_history", JSON.stringify(messages)); } catch (e) {} }, [messages]);
   const clearChat = () => { setMessages([WELCOME_MSG]); try { localStorage.removeItem("ai_chat_history"); } catch (e) {} };
 
+  const [ollamaModel, setOllamaModel] = useState(() => localStorage.getItem("ai_ollama_model") || "llama3.1");
+  const [modelInput, setModelInput] = useState(() => localStorage.getItem("ai_ollama_model") || "llama3.1");
+
   const saveKey = () => {
-    if (keyInput.trim() && providerPick) {
+    if (!providerPick) return;
+    if (providerPick === "ollama") {
+      const url = (keyInput.trim() || "http://localhost:11434").replace(/\/$/, "");
+      localStorage.setItem("ai_key", url);
+      localStorage.setItem("ai_provider", "ollama");
+      localStorage.setItem("ai_ollama_model", modelInput.trim() || "llama3.1");
+      setApiKey(url); setProvider("ollama"); setOllamaModel(modelInput.trim() || "llama3.1");
+      return;
+    }
+    if (keyInput.trim()) {
       localStorage.setItem("ai_key", keyInput.trim());
       localStorage.setItem("ai_provider", providerPick);
       setApiKey(keyInput.trim());
@@ -523,8 +535,8 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTas
     }
   };
   const clearKey = () => {
-    localStorage.removeItem("ai_key"); localStorage.removeItem("ai_provider");
-    setApiKey(""); setProvider(""); setKeyInput(""); setProviderPick("");
+    localStorage.removeItem("ai_key"); localStorage.removeItem("ai_provider"); localStorage.removeItem("ai_ollama_model");
+    setApiKey(""); setProvider(""); setKeyInput(""); setProviderPick(""); setModelInput("llama3.1");
   };
 
   const QUICK = [
@@ -699,6 +711,43 @@ DATA:\n${ctx}`;
     return "I've completed the requested actions.";
   };
 
+  const runOllamaAgent = async (userText, history, onTrace) => {
+    const sysPrompt = buildSystemPrompt();
+    let msgs = [{ role: "system", content: sysPrompt }];
+    history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
+    msgs.push({ role: "user", content: userText });
+    const tools = groqToolSchema(); // OpenAI-compatible format, same as Groq
+
+    for (let step = 0; step < 6; step++) {
+      let r;
+      try {
+        r = await fetch(apiKey + "/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: ollamaModel, messages: msgs, tools, tool_choice: "auto", max_tokens: 1024 })
+        });
+      } catch (netErr) {
+        throw new Error("Can't reach Ollama at " + apiKey + ". Make sure Ollama is running locally and OLLAMA_ORIGINS allows this site.");
+      }
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || ("Ollama error: " + r.status + ". Check the model name '" + ollamaModel + "' is pulled (run: ollama pull " + ollamaModel + ")")); }
+      const data = await r.json();
+      const msg = data.choices?.[0]?.message;
+      if (!msg) throw new Error("Empty response from Ollama.");
+      if (msg.tool_calls && msg.tool_calls.length) {
+        msgs.push(msg);
+        msg.tool_calls.forEach(tc => {
+          let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (e) {}
+          onTrace(tc.function.name, args);
+          const result = executeTool(tc.function.name, args);
+          msgs.push({ role: "tool", tool_call_id: tc.id || uid(), content: JSON.stringify(result) });
+        });
+        continue;
+      }
+      return msg.content || "Done!";
+    }
+    return "I've completed the requested actions.";
+  };
+
   const sendMessage = async (text) => {
     if (!text.trim() || loading) return;
     const userText = text.trim();
@@ -715,6 +764,7 @@ DATA:\n${ctx}`;
       let reply;
       if (provider === "anthropic") reply = await runAnthropicAgent(userText, history, onTrace);
       else if (provider === "gemini") reply = await runGeminiAgent(userText, history, onTrace);
+      else if (provider === "ollama") reply = await runOllamaAgent(userText, history, onTrace);
       else reply = await runGroqAgent(userText, history, onTrace);
 
       setMessages(prev => [...prev, { role: "assistant", text: reply || "Done!" }]);
@@ -726,7 +776,7 @@ DATA:\n${ctx}`;
   };
 
   const isConnected = provider && apiKey;
-  const providerLabel = provider === "groq" ? "⚡ Groq Llama (Free)" : provider === "gemini" ? "🟢 Gemini (Free)" : provider === "anthropic" ? "🟣 Claude Sonnet" : "";
+  const providerLabel = provider === "groq" ? "⚡ Groq Llama (Free)" : provider === "gemini" ? "🟢 Gemini (Free)" : provider === "ollama" ? "🦙 Ollama (Local, " + ollamaModel + ")" : provider === "anthropic" ? "🟣 Claude Sonnet" : "";
 
   return (
     <div>
@@ -743,38 +793,64 @@ DATA:\n${ctx}`;
           {/* Provider selection */}
           <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
             <button onClick={() => setProviderPick("groq")} style={{
-              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 175, textAlign: "center", transition: "all .15s",
+              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 160, textAlign: "center", transition: "all .15s",
               background: providerPick === "groq" ? "#FFF7ED" : "#fff",
               border: providerPick === "groq" ? "2px solid #F97316" : "2px solid #E2E8F0"
             }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>⚡</div>
-              <div style={{ fontWeight: 800, fontSize: 14, color: "#EA580C" }}>Groq</div>
-              <div style={{ fontSize: 11, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE ★ Recommended</div>
-              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Llama 3.3 70B</div>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>⚡</div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: "#EA580C" }}>Groq</div>
+              <div style={{ fontSize: 10, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE ★ Recommended</div>
+              <div style={{ fontSize: 9, color: "#64748B", marginTop: 4 }}>Llama 3.3 70B</div>
+            </button>
+            <button onClick={() => setProviderPick("ollama")} style={{
+              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 160, textAlign: "center", transition: "all .15s",
+              background: providerPick === "ollama" ? "#EFF6FF" : "#fff",
+              border: providerPick === "ollama" ? "2px solid #2563EB" : "2px solid #E2E8F0"
+            }}>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>🦙</div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: "#2563EB" }}>Ollama</div>
+              <div style={{ fontSize: 10, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE • Local</div>
+              <div style={{ fontSize: 9, color: "#64748B", marginTop: 4 }}>Runs on your PC</div>
             </button>
             <button onClick={() => setProviderPick("gemini")} style={{
-              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 175, textAlign: "center", transition: "all .15s",
+              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 160, textAlign: "center", transition: "all .15s",
               background: providerPick === "gemini" ? "#F0FDF4" : "#fff",
               border: providerPick === "gemini" ? "2px solid #22C55E" : "2px solid #E2E8F0"
             }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>✨</div>
-              <div style={{ fontWeight: 800, fontSize: 14, color: "#059669" }}>Google Gemini</div>
-              <div style={{ fontSize: 11, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE</div>
-              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Gemini 2.0 Flash</div>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>✨</div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: "#059669" }}>Google Gemini</div>
+              <div style={{ fontSize: 10, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE</div>
+              <div style={{ fontSize: 9, color: "#64748B", marginTop: 4 }}>Gemini 2.0 Flash</div>
             </button>
             <button onClick={() => setProviderPick("anthropic")} style={{
-              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 175, textAlign: "center", transition: "all .15s",
+              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 160, textAlign: "center", transition: "all .15s",
               background: providerPick === "anthropic" ? "#F5F3FF" : "#fff",
               border: providerPick === "anthropic" ? "2px solid #7C3AED" : "2px solid #E2E8F0"
             }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>🟣</div>
-              <div style={{ fontWeight: 800, fontSize: 14, color: "#7C3AED" }}>Anthropic Claude</div>
-              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, marginTop: 2 }}>PAID</div>
-              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Claude Sonnet 4.6</div>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>🟣</div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: "#7C3AED" }}>Anthropic Claude</div>
+              <div style={{ fontSize: 10, color: "#94A3B8", fontWeight: 700, marginTop: 2 }}>PAID</div>
+              <div style={{ fontSize: 9, color: "#64748B", marginTop: 4 }}>Claude Sonnet 4.6</div>
             </button>
           </div>
 
-          {providerPick && <>
+          {providerPick === "ollama" && <>
+            <div style={{ display: "flex", gap: 8, maxWidth: 440, margin: "0 auto", marginBottom: 8, flexWrap: "wrap", justifyContent: "center" }}>
+              <input className="field-input" value={keyInput} onChange={e => setKeyInput(e.target.value)}
+                placeholder="http://localhost:11434" style={{ flex: "1 1 200px", fontSize: 12, textAlign: "center" }}
+                onKeyDown={e => { if (e.key === "Enter") saveKey(); }} />
+              <input className="field-input" value={modelInput} onChange={e => setModelInput(e.target.value)}
+                placeholder="llama3.1" style={{ flex: "0 1 140px", fontSize: 12, textAlign: "center" }}
+                onKeyDown={e => { if (e.key === "Enter") saveKey(); }} />
+              <button className="btn btn-primary" onClick={saveKey}>Connect</button>
+            </div>
+            <p style={{ color: "#94A3B8", fontSize: 11, maxWidth: 460, margin: "0 auto" }}>
+              Ollama must be running locally with tool-calling support. Server URL + model name (e.g. llama3.1, qwen2.5, mistral-nemo). <br/>
+              <b>Important:</b> start Ollama with CORS enabled: <code style={{ background: "#F1F5F9", padding: "1px 5px", borderRadius: 4 }}>OLLAMA_ORIGINS=* ollama serve</code> — otherwise the browser will block the connection.
+            </p>
+          </>}
+
+          {providerPick && providerPick !== "ollama" && <>
             <div style={{ display: "flex", gap: 8, maxWidth: 440, margin: "0 auto", marginBottom: 12 }}>
               <input className="field-input" value={keyInput} onChange={e => setKeyInput(e.target.value)}
                 placeholder={providerPick === "groq" ? "gsk_... (from Groq Console)" : providerPick === "gemini" ? "AIzaSy... (from Google AI Studio)" : "sk-ant-api03-... (from Anthropic Console)"}
