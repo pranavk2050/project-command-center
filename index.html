@@ -485,7 +485,10 @@ const AGENT_TOOLS = [
     required: ["activityText"] },
   { name: "delete_milestone", description: "Delete a milestone by matching its title. Destructive.",
     properties: { milestoneTitle: { type: "string", description: "Title or partial title of the milestone to delete" } },
-    required: ["milestoneTitle"] }
+    required: ["milestoneTitle"] },
+  { name: "restore_deleted_item", description: "Restore a previously deleted project, task, log entry, or milestone by searching GitHub's saved history for the last version before it was deleted. Use this specifically when the user asks to undo, restore, bring back, or recover something that was deleted. Non-destructive — safe to call without extra confirmation.",
+    properties: { itemType: { type: "string", description: "One of: project, task, log, milestone" }, searchText: { type: "string", description: "Name, title, or activity text of the deleted item to search for" } },
+    required: ["itemType", "searchText"] }
 ];
 
 const anthropicToolSchema = () => AGENT_TOOLS.map(t => ({ name: t.name, description: t.description, input_schema: { type: "object", properties: t.properties, required: t.required } }));
@@ -506,6 +509,7 @@ function toolLabel(name, args) {
   if (name === "delete_task") return "Deleting task \"" + (args.taskTitle || "") + "\"";
   if (name === "delete_log") return "Deleting log entry \"" + (args.activityText || "").slice(0, 30) + "\"";
   if (name === "delete_milestone") return "Deleting milestone \"" + (args.milestoneTitle || "") + "\"";
+  if (name === "restore_deleted_item") return "Searching history to restore \"" + (args.searchText || "") + "\"";
   return "Running " + name;
 }
 
@@ -579,6 +583,7 @@ RULES:
 - When the user asks you to add/create/log/update something, use the appropriate tool. You may call multiple tools in sequence if the request needs it (e.g. "create a project and add 3 tasks to it").
 - CRITICAL: Never say something was created, added, updated, or logged unless you actually called the matching tool in this turn and it succeeded. Do not describe a project/task/log/milestone as done, give it an ID, or write confirmation text like "has been created" without a real tool call behind it. If you're not calling a tool, don't claim an action happened — just answer or ask a clarifying question instead.
 - Deletion tools (delete_project, delete_task, delete_log, delete_milestone) are destructive and cannot be undone from the dashboard. Only call them when the user has clearly and explicitly asked to delete/remove something — never delete proactively or as a side effect of another request. If it's unclear exactly which item they mean, ask for clarification instead of guessing.
+- If the user asks to undo, restore, bring back, or recover something that was deleted, use restore_deleted_item — it searches actual saved history and recovers the real original data (not a fresh recreation with the same name). It may take a few seconds since it searches through past saves. If it can't find a match, say so plainly rather than offering to "recreate" a lookalike unless the user asks for that instead.
 - Always use an existing project's id from the data when given. If the user names a project that doesn't exist yet, ask whether to create it first (or create it if that seems clearly intended).
 - After using tools, give a short natural confirmation summarizing what you did.
 - For weekly summaries or analysis questions, give a structured brief: tasks completed, in progress, overdue, key activity, recommendations — no tool needed for these.
@@ -595,7 +600,7 @@ DATA:\n${ctx}`;
     return byName ? byName.id : idOrName;
   };
 
-  const executeTool = (name, args) => {
+  const executeTool = async (name, args) => {
     try {
       if (name === "create_project") {
         const newProj = { id: uid(), name: args.name, description: args.description || "", owner: args.owner || "", startDate: todayStr(), targetEnd: args.targetEnd || "", color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)], createdAt: todayStr() };
@@ -655,6 +660,47 @@ DATA:\n${ctx}`;
         onDeleteMilestone(matches[0].id);
         return { success: true, message: "Deleted milestone '" + matches[0].title + "'" };
       }
+      if (name === "restore_deleted_item") {
+        const ghToken = localStorage.getItem("gh_token");
+        if (!ghToken) return { success: false, message: "No GitHub token found — can't search history." };
+        const itemType = String(args.itemType || "").toLowerCase();
+        const arrKey = itemType === "project" ? "projects" : itemType === "task" ? "tasks" : itemType === "log" ? "logs" : itemType === "milestone" ? "milestones" : null;
+        if (!arrKey) return { success: false, message: "itemType must be project, task, log, or milestone." };
+        const nameField = arrKey === "logs" ? "activity" : arrKey === "projects" ? "name" : "title";
+        const searchLower = String(args.searchText || "").toLowerCase();
+
+        const commitsRes = await fetch("https://api.github.com/repos/" + REPO + "/commits?path=data.json&per_page=50", { headers: { "Authorization": "token " + ghToken, "Accept": "application/vnd.github+json" } });
+        if (!commitsRes.ok) return { success: false, message: "Couldn't fetch history from GitHub (status " + commitsRes.status + ")." };
+        const commits = await commitsRes.json();
+
+        for (const commit of commits) {
+          try {
+            const raw = await fetch("https://raw.githubusercontent.com/" + REPO + "/" + commit.sha + "/data.json");
+            if (!raw.ok) continue;
+            const snapshot = await raw.json();
+            const found = (snapshot[arrKey] || []).find(item => (item[nameField] || "").toLowerCase().includes(searchLower));
+            if (!found) continue;
+
+            const currentList = arrKey === "projects" ? projects : arrKey === "tasks" ? tasks : arrKey === "logs" ? logs : milestones;
+            if (currentList.some(x => x.id === found.id)) return { success: false, message: "That " + itemType + " already exists in the dashboard — nothing to restore." };
+
+            if (arrKey === "projects") {
+              onAddProject(found);
+              const relatedTasks = (snapshot.tasks || []).filter(t => t.projectId === found.id);
+              const relatedLogs = (snapshot.logs || []).filter(l => l.projectId === found.id);
+              const relatedMilestones = (snapshot.milestones || []).filter(m => m.projectId === found.id);
+              relatedTasks.forEach(t => onAddTask(t));
+              relatedLogs.forEach(l => onAddLog(l));
+              relatedMilestones.forEach(m => onAddMilestone(m));
+              return { success: true, message: "Restored project '" + found.name + "' with " + relatedTasks.length + " task(s), " + relatedLogs.length + " log(s), " + relatedMilestones.length + " milestone(s), from a save made " + new Date(commit.commit.author.date).toLocaleString() + "." };
+            }
+            if (arrKey === "tasks") { onAddTask(found); return { success: true, message: "Restored task '" + found.title + "'." }; }
+            if (arrKey === "logs") { onAddLog(found); return { success: true, message: "Restored log entry '" + found.activity + "'." }; }
+            if (arrKey === "milestones") { onAddMilestone(found); return { success: true, message: "Restored milestone '" + found.title + "'." }; }
+          } catch (e) { continue; }
+        }
+        return { success: false, message: "Couldn't find '" + args.searchText + "' as a deleted " + itemType + " in the last 50 saves. It may be older than that." };
+      }
       return { success: false, message: "Unknown tool: " + name };
     } catch (e) {
       return { success: false, message: "Error executing " + name + ": " + e.message };
@@ -682,11 +728,12 @@ DATA:\n${ctx}`;
       if (toolUses.length === 0) return textParts || "Done!";
 
       msgs.push({ role: "assistant", content });
-      const toolResults = toolUses.map(tu => {
+      const toolResults = [];
+      for (const tu of toolUses) {
         onTrace(tu.name, tu.input);
-        const result = executeTool(tu.name, tu.input);
-        return { type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(result) };
-      });
+        const result = await executeTool(tu.name, tu.input);
+        toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(result) });
+      }
       msgs.push({ role: "user", content: toolResults });
     }
     return "I've completed the requested actions.";
@@ -711,12 +758,12 @@ DATA:\n${ctx}`;
       if (!msg) throw new Error("Empty response from Groq.");
       if (msg.tool_calls && msg.tool_calls.length) {
         msgs.push(msg);
-        msg.tool_calls.forEach(tc => {
+        for (const tc of msg.tool_calls) {
           let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (e) {}
           onTrace(tc.function.name, args);
-          const result = executeTool(tc.function.name, args);
+          const result = await executeTool(tc.function.name, args);
           msgs.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
-        });
+        }
         continue;
       }
       return msg.content || "Done!";
@@ -748,11 +795,12 @@ DATA:\n${ctx}`;
       if (fnCalls.length === 0) return textParts || "Done!";
 
       contents.push({ role: "model", parts });
-      const responseParts = fnCalls.map(fc => {
+      const responseParts = [];
+      for (const fc of fnCalls) {
         onTrace(fc.functionCall.name, fc.functionCall.args || {});
-        const result = executeTool(fc.functionCall.name, fc.functionCall.args || {});
-        return { functionResponse: { name: fc.functionCall.name, response: result } };
-      });
+        const result = await executeTool(fc.functionCall.name, fc.functionCall.args || {});
+        responseParts.push({ functionResponse: { name: fc.functionCall.name, response: result } });
+      }
       contents.push({ role: "user", parts: responseParts });
     }
     return "I've completed the requested actions.";
@@ -782,12 +830,12 @@ DATA:\n${ctx}`;
       if (!msg) throw new Error("Empty response from Ollama.");
       if (msg.tool_calls && msg.tool_calls.length) {
         msgs.push(msg);
-        msg.tool_calls.forEach(tc => {
+        for (const tc of msg.tool_calls) {
           let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (e) {}
           onTrace(tc.function.name, args);
-          const result = executeTool(tc.function.name, args);
+          const result = await executeTool(tc.function.name, args);
           msgs.push({ role: "tool", tool_call_id: tc.id || uid(), content: JSON.stringify(result) });
-        });
+        }
         continue;
       }
       return msg.content || "Done!";
