@@ -31,16 +31,6 @@
       "createdAt": "2026-07-13"
     },
     {
-      "id": "mrjhs4isiapq6",
-      "name": "P&ID Digitization, Tech-Hive Upgradation and Migration",
-      "description": "",
-      "owner": "Pranav Kulkarni",
-      "startDate": "2026-07-13",
-      "targetEnd": "2026-12-31",
-      "color": "#0891B2",
-      "createdAt": "2026-07-13"
-    },
-    {
       "id": "mrjhtg9zgz5by",
       "name": "P&ID Digitization",
       "description": "",
@@ -211,5 +201,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T17:25:18.622Z"
+  "lastUpdated": "2026-07-13T17:25:36.241Z"
 }
