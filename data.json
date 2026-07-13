@@ -59,6 +59,16 @@
       "targetEnd": "2026-12-31",
       "color": "#7C3AED",
       "createdAt": "2026-07-13"
+    },
+    {
+      "id": "mrjfr0o53a35p",
+      "name": "Risk Summary Tool",
+      "description": "A project to develop a risk summary tool",
+      "owner": "Pranav Kulkarni",
+      "startDate": "2026-07-13",
+      "targetEnd": "2026-12-31",
+      "color": "#0891B2",
+      "createdAt": "2026-07-13"
     }
   ],
   "tasks": [
