@@ -539,7 +539,6 @@ DATA:\n${ctx}`;
   const callGemini = async (userText, history) => {
     const sysPrompt = buildSystemPrompt();
     const contents = [];
-    // Embed system prompt as first user context for max compatibility
     contents.push({ role: "user", parts: [{ text: "SYSTEM CONTEXT:\n" + sysPrompt + "\n\nAcknowledge you have this data and are ready to help." }] });
     contents.push({ role: "model", parts: [{ text: "I have all your project data loaded. Ready to help, Pranav!" }] });
     history.forEach(m => {
@@ -548,8 +547,7 @@ DATA:\n${ctx}`;
     });
     contents.push({ role: "user", parts: [{ text: userText }] });
     const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents })
     });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Gemini API error: " + r.status); }
@@ -557,6 +555,23 @@ DATA:\n${ctx}`;
     const parts = data.candidates?.[0]?.content?.parts;
     if (!parts || !parts.length) throw new Error("Empty response from Gemini.");
     return parts.map(p => p.text || "").join("");
+  };
+
+  const callGroq = async (userText, history) => {
+    const sysPrompt = buildSystemPrompt();
+    const msgs = [{ role: "system", content: sysPrompt }];
+    history.forEach(m => {
+      if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text });
+    });
+    msgs.push({ role: "user", content: userText });
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+      body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 1000 })
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Groq API error: " + r.status); }
+    const data = await r.json();
+    return data.choices?.[0]?.message?.content || "No response.";
   };
 
   const sendMessage = async (text) => {
@@ -570,11 +585,9 @@ DATA:\n${ctx}`;
       // Build clean history (skip the initial welcome message)
       const history = messages.slice(1).filter(m => m.role === "user" || m.role === "assistant");
       let reply;
-      if (provider === "anthropic") {
-        reply = await callAnthropic(userText, history);
-      } else {
-        reply = await callGemini(userText, history);
-      }
+      if (provider === "anthropic") reply = await callAnthropic(userText, history);
+      else if (provider === "gemini") reply = await callGemini(userText, history);
+      else reply = await callGroq(userText, history);
 
       // Parse actions from reply
       const actionMatch = reply.match(/<action>([\s\S]*?)<\/action>/);
@@ -605,7 +618,7 @@ DATA:\n${ctx}`;
   };
 
   const isConnected = provider && apiKey;
-  const providerLabel = provider === "gemini" ? "🟢 Gemini Flash (Free)" : provider === "anthropic" ? "🟣 Claude Sonnet" : "";
+  const providerLabel = provider === "groq" ? "⚡ Groq Llama (Free)" : provider === "gemini" ? "🟢 Gemini (Free)" : provider === "anthropic" ? "🟣 Claude Sonnet" : "";
 
   return (
     <div>
@@ -620,9 +633,19 @@ DATA:\n${ctx}`;
           </p>
 
           {/* Provider selection */}
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
+            <button onClick={() => setProviderPick("groq")} style={{
+              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 175, textAlign: "center", transition: "all .15s",
+              background: providerPick === "groq" ? "#FFF7ED" : "#fff",
+              border: providerPick === "groq" ? "2px solid #F97316" : "2px solid #E2E8F0"
+            }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>⚡</div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: "#EA580C" }}>Groq</div>
+              <div style={{ fontSize: 11, color: "#22C55E", fontWeight: 700, marginTop: 2 }}>FREE ★ Recommended</div>
+              <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Llama 3.3 70B</div>
+            </button>
             <button onClick={() => setProviderPick("gemini")} style={{
-              padding: "16px 24px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 200, textAlign: "center", transition: "all .15s",
+              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 175, textAlign: "center", transition: "all .15s",
               background: providerPick === "gemini" ? "#F0FDF4" : "#fff",
               border: providerPick === "gemini" ? "2px solid #22C55E" : "2px solid #E2E8F0"
             }}>
@@ -632,7 +655,7 @@ DATA:\n${ctx}`;
               <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>Gemini 2.0 Flash</div>
             </button>
             <button onClick={() => setProviderPick("anthropic")} style={{
-              padding: "16px 24px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 200, textAlign: "center", transition: "all .15s",
+              padding: "16px 20px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", width: 175, textAlign: "center", transition: "all .15s",
               background: providerPick === "anthropic" ? "#F5F3FF" : "#fff",
               border: providerPick === "anthropic" ? "2px solid #7C3AED" : "2px solid #E2E8F0"
             }}>
@@ -646,14 +669,16 @@ DATA:\n${ctx}`;
           {providerPick && <>
             <div style={{ display: "flex", gap: 8, maxWidth: 440, margin: "0 auto", marginBottom: 12 }}>
               <input className="field-input" value={keyInput} onChange={e => setKeyInput(e.target.value)}
-                placeholder={providerPick === "gemini" ? "AIzaSy... (from Google AI Studio)" : "sk-ant-api03-... (from Anthropic Console)"}
+                placeholder={providerPick === "groq" ? "gsk_... (from Groq Console)" : providerPick === "gemini" ? "AIzaSy... (from Google AI Studio)" : "sk-ant-api03-... (from Anthropic Console)"}
                 style={{ flex: 1, fontSize: 12, textAlign: "center" }}
                 onKeyDown={e => { if (e.key === "Enter") saveKey(); }} />
               <button className="btn btn-primary" onClick={saveKey}>Connect</button>
             </div>
             <p style={{ color: "#94A3B8", fontSize: 11 }}>
-              {providerPick === "gemini"
-                ? <>Get free key: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style={{ color: "#059669" }}>aistudio.google.com → Get API Key</a> (no credit card needed)</>
+              {providerPick === "groq"
+                ? <>Get free key (30 sec): <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style={{ color: "#EA580C" }}>console.groq.com → API Keys</a> — no credit card needed</>
+                : providerPick === "gemini"
+                ? <>Get free key: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style={{ color: "#059669" }}>aistudio.google.com → Get API Key</a></>
                 : <>Get key: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style={{ color: "#7C3AED" }}>console.anthropic.com → API Keys</a></>
               }
             </p>
