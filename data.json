@@ -49,6 +49,16 @@
       "targetEnd": "2026-12-31",
       "color": "#0891B2",
       "createdAt": "2026-07-13"
+    },
+    {
+      "id": "mrji40adxvgfr",
+      "name": "PFD to P&ID conversion Tool",
+      "description": "Tool for converting Process and Instrumentation Diagrams (P&IDs) from Process Flow Diagrams (PFDs)",
+      "owner": "Pranav Kulkarni",
+      "startDate": "2026-07-13",
+      "targetEnd": "2026-12-31",
+      "color": "#15803D",
+      "createdAt": "2026-07-13"
     }
   ],
   "tasks": [
@@ -201,5 +211,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T17:25:36.241Z"
+  "lastUpdated": "2026-07-13T17:33:31.117Z"
 }
