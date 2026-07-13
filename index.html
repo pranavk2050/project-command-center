@@ -457,8 +457,44 @@ function InteractiveMindMap({ tree, title }) {
   );
 }
 
+/* ═══ AI AGENT TOOL DEFINITIONS ═══ */
+const AGENT_TOOLS = [
+  { name: "create_project", description: "Create a new project in the dashboard.",
+    properties: { name: { type: "string", description: "Project name" }, description: { type: "string", description: "Short scope description" }, owner: { type: "string", description: "Stakeholder / senior manager name" }, targetEnd: { type: "string", description: "Target end date, format YYYY-MM-DD" } },
+    required: ["name"] },
+  { name: "create_task", description: "Create a new task under an existing project.",
+    properties: { title: { type: "string", description: "Task title" }, projectId: { type: "string", description: "The id of an existing project from the data (or its name if id unknown)" }, priority: { type: "string", description: "High, Medium, or Low" }, deadline: { type: "string", description: "YYYY-MM-DD" }, assignedBy: { type: "string", description: "Who assigned this task" }, source: { type: "string", description: "Email, Meeting, Chat, Project Tool, or Self" }, description: { type: "string", description: "Task details" } },
+    required: ["title", "projectId"] },
+  { name: "create_log", description: "Add a daily activity log entry, optionally linked to a project.",
+    properties: { activity: { type: "string", description: "What was done" }, duration: { type: "string", description: "e.g. '2 hours', '30 min'" }, projectId: { type: "string", description: "Project id or name (optional)" }, category: { type: "string", description: "One of: Meeting / Call, Task Progress, Email / Follow-up, Review / Approval, Problem Solving, Coordination, Learning / Training, Reporting / MIS" }, outcome: { type: "string", description: "Result achieved" } },
+    required: ["activity"] },
+  { name: "create_milestone", description: "Add a milestone to a project.",
+    properties: { title: { type: "string" }, projectId: { type: "string", description: "Project id or name" }, targetDate: { type: "string", description: "YYYY-MM-DD" }, progress: { type: "number", description: "0 to 100" } },
+    required: ["title"] },
+  { name: "update_task_status", description: "Update the status of an existing task by matching its title text.",
+    properties: { taskTitle: { type: "string", description: "Exact or partial title of the task to find" }, newStatus: { type: "string", description: "Not Started, In Progress, On Hold, or Completed" } },
+    required: ["taskTitle", "newStatus"] }
+];
+
+const anthropicToolSchema = () => AGENT_TOOLS.map(t => ({ name: t.name, description: t.description, input_schema: { type: "object", properties: t.properties, required: t.required } }));
+const groqToolSchema = () => AGENT_TOOLS.map(t => ({ type: "function", function: { name: t.name, description: t.description, parameters: { type: "object", properties: t.properties, required: t.required } } }));
+const geminiTypeMap = { string: "STRING", number: "NUMBER", boolean: "BOOLEAN" };
+const geminiToolSchema = () => [{ function_declarations: AGENT_TOOLS.map(t => {
+  const props = {}; Object.entries(t.properties).forEach(([k, v]) => { props[k] = { type: geminiTypeMap[v.type] || "STRING", description: v.description || "" }; });
+  return { name: t.name, description: t.description, parameters: { type: "OBJECT", properties: props, required: t.required } };
+}) }];
+
+function toolLabel(name, args) {
+  if (name === "create_project") return "Creating project \"" + (args.name || "") + "\"";
+  if (name === "create_task") return "Adding task \"" + (args.title || "") + "\"";
+  if (name === "create_log") return "Logging activity: \"" + (args.activity || "").slice(0, 40) + "\"";
+  if (name === "create_milestone") return "Adding milestone \"" + (args.title || "") + "\"";
+  if (name === "update_task_status") return "Updating \"" + (args.taskTitle || "") + "\" → " + (args.newStatus || "");
+  return "Running " + name;
+}
+
 /* ═══ AI ASSISTANT AGENT ═══ */
-function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTask, onAddLog, onAddMilestone }) {
+function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTask, onUpdateTask, onAddLog, onAddMilestone }) {
   const [provider, setProvider] = useState(() => localStorage.getItem("ai_provider") || "");
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("ai_key") || "");
   const [keyInput, setKeyInput] = useState("");
@@ -500,79 +536,160 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onAddTas
     const recentLogs = logs.slice(0, 20);
     const ctx = `TODAY: ${now}\nPROFILE: ${PROFILE.name}, ${PROFILE.role}\n\nPROJECTS (${projects.length}):\n${projects.map(p => { const pT=tasks.filter(t=>t.projectId===p.id); const done=pT.filter(t=>t.status==="Completed").length; const pct=pT.length?Math.round(done/pT.length*100):0; return "- "+p.name+" [id:"+p.id+"] ("+pct+"% done, "+pT.length+" tasks, stakeholder: "+(p.owner||"N/A")+", deadline: "+(p.targetEnd||"N/A")+")"; }).join("\n")}\n\nALL TASKS (${tasks.length}):\n${tasks.map(t => { const proj=projects.find(p=>p.id===t.projectId); const isOv=t.status!=="Completed"&&t.deadline&&t.deadline<now; return "- ["+(isOv?"OVERDUE":t.status)+'] "'+t.title+'" | Project: '+(proj?.name||"?")+" ["+t.projectId+"] | Priority: "+t.priority+" | Deadline: "+(t.deadline||"none")+" | By: "+(t.assignedBy||"self")+" | Source: "+t.source; }).join("\n")}\n\nOVERDUE (${overdue.length}): ${overdue.map(t=>'"'+t.title+'" ('+daysBetween(now,t.deadline)+"d late)").join(", ")||"None"}\nIN PROGRESS (${inProg.length}): ${inProg.map(t=>'"'+t.title+'"').join(", ")||"None"}\n\nMILESTONES (${milestones.length}):\n${milestones.map(m => { const proj=projects.find(p=>p.id===m.projectId); return '- "'+m.title+'" | Project: '+(proj?.name||"?")+" ["+m.projectId+"] | "+m.progress+"% | Status: "+m.status+" | Target: "+(m.targetDate||"N/A"); }).join("\n")}\n\nRECENT LOGS (last 20):\n${recentLogs.map(l => { const proj=projects.find(p=>p.id===l.projectId); return "- "+l.date+" | "+(l.duration||"?")+" | "+(l.category||"")+" | \""+l.activity+'" | Project: '+(proj?.name||"General")+" | Outcome: "+(l.outcome||"N/A"); }).join("\n")}`;
 
-    return `You are Pranav Kulkarni's personal project assistant embedded in his Project Command Center dashboard. You have access to ALL his current project data below.
+    return `You are Pranav Kulkarni's personal project assistant embedded in his Project Command Center dashboard. You have access to ALL his current project data below, and you have tools to create projects, tasks, logs, and milestones, and to update task status.
 
 RULES:
 - Be concise and direct. Use short paragraphs, not long essays.
 - When asked analytical questions, reference specific data (project names, task counts, dates).
-- For task/log/milestone/project actions, respond with a JSON action block wrapped EXACTLY in <action> and </action> tags — no other format, no parentheses, no question marks. Example: <action>{"type":"task",...}</action>
-- For project: <action>{"type":"project","name":"...","description":"...","owner":"...","targetEnd":"YYYY-MM-DD"}</action>
-- For task: <action>{"type":"task","title":"...","projectId":"...","priority":"High/Medium/Low","status":"Not Started","deadline":"YYYY-MM-DD","assignedBy":"...","source":"Email/Meeting/Chat/Self"}</action>
-- For log: <action>{"type":"log","activity":"...","duration":"...","projectId":"...","category":"Meeting / Call|Task Progress|Email / Follow-up|Review / Approval|Problem Solving|Coordination|Learning / Training|Reporting / MIS","outcome":"..."}</action>
-- For milestone: <action>{"type":"milestone","title":"...","projectId":"...","targetDate":"YYYY-MM-DD","status":"Not Started","progress":0}</action>
-- Always confirm after adding: "Done! I've added..."
-- If user mentions a project name, match it to the project ID from the data.
-- For weekly summaries, give a structured brief: tasks completed, in progress, overdue, key activity, recommendations.
+- When the user asks you to add/create/log/update something, use the appropriate tool. You may call multiple tools in sequence if the request needs it (e.g. "create a project and add 3 tasks to it").
+- Always use an existing project's id from the data when given. If the user names a project that doesn't exist yet, ask whether to create it first (or create it if that seems clearly intended).
+- After using tools, give a short natural confirmation summarizing what you did.
+- For weekly summaries or analysis questions, give a structured brief: tasks completed, in progress, overdue, key activity, recommendations — no tool needed for these.
 - Be encouraging but professional. This data may be shown to senior leadership.
 
 DATA:\n${ctx}`;
   };
 
-  const callAnthropic = async (userText, history) => {
-    const sysPrompt = buildSystemPrompt();
-    const apiMsgs = [];
-    history.forEach(m => {
-      if (m.role === "user" || m.role === "assistant") {
-        apiMsgs.push({ role: m.role, content: m.text });
-      }
-    });
-    apiMsgs.push({ role: "user", content: userText });
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, system: sysPrompt, messages: apiMsgs })
-    });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Anthropic API error: " + r.status); }
-    const data = await r.json();
-    return (data.content || []).map(c => c.text || "").join("") || "No response received.";
+  const resolveProjectId = (idOrName) => {
+    if (!idOrName) return "";
+    const direct = projects.find(p => p.id === idOrName);
+    if (direct) return direct.id;
+    const byName = projects.find(p => p.name.toLowerCase().includes(String(idOrName).toLowerCase()));
+    return byName ? byName.id : idOrName;
   };
 
-  const callGemini = async (userText, history) => {
+  const executeTool = (name, args) => {
+    try {
+      if (name === "create_project") {
+        const newProj = { id: uid(), name: args.name, description: args.description || "", owner: args.owner || "", startDate: todayStr(), targetEnd: args.targetEnd || "", color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)], createdAt: todayStr() };
+        onAddProject(newProj);
+        return { success: true, message: "Created project '" + newProj.name + "'", projectId: newProj.id };
+      }
+      if (name === "create_task") {
+        const pid = resolveProjectId(args.projectId);
+        const task = { id: uid(), title: args.title, description: args.description || "", assignedBy: args.assignedBy || "", source: args.source || "Self", priority: args.priority || "Medium", status: "Not Started", deadline: args.deadline || "", projectId: pid, remarks: "", createdAt: todayStr(), updatedAt: todayStr() };
+        onAddTask(task);
+        return { success: true, message: "Created task '" + task.title + "'" };
+      }
+      if (name === "create_log") {
+        const pid = resolveProjectId(args.projectId);
+        const log = { id: uid(), date: todayStr(), activity: args.activity, duration: args.duration || "", projectId: pid, category: args.category || "Task Progress", outcome: args.outcome || "" };
+        onAddLog(log);
+        return { success: true, message: "Logged: '" + log.activity + "'" };
+      }
+      if (name === "create_milestone") {
+        const pid = resolveProjectId(args.projectId);
+        const ms = { id: uid(), title: args.title, projectId: pid, targetDate: args.targetDate || "", status: "Not Started", progress: args.progress || 0, notes: "" };
+        onAddMilestone(ms);
+        return { success: true, message: "Created milestone '" + ms.title + "'" };
+      }
+      if (name === "update_task_status") {
+        const match = tasks.find(t => t.title.toLowerCase().includes(String(args.taskTitle || "").toLowerCase()));
+        if (!match) return { success: false, message: "No task found matching '" + args.taskTitle + "'" };
+        onUpdateTask({ ...match, status: args.newStatus, updatedAt: todayStr() });
+        return { success: true, message: "Updated '" + match.title + "' to " + args.newStatus };
+      }
+      return { success: false, message: "Unknown tool: " + name };
+    } catch (e) {
+      return { success: false, message: "Error executing " + name + ": " + e.message };
+    }
+  };
+
+  const runAnthropicAgent = async (userText, history, onTrace) => {
     const sysPrompt = buildSystemPrompt();
-    const contents = [];
-    contents.push({ role: "user", parts: [{ text: "SYSTEM CONTEXT:\n" + sysPrompt + "\n\nAcknowledge you have this data and are ready to help." }] });
-    contents.push({ role: "model", parts: [{ text: "I have all your project data loaded. Ready to help, Pranav!" }] });
+    let msgs = [];
+    history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
+    msgs.push({ role: "user", content: userText });
+    const tools = anthropicToolSchema();
+
+    for (let step = 0; step < 6; step++) {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1024, system: sysPrompt, tools, messages: msgs })
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Anthropic API error: " + r.status); }
+      const data = await r.json();
+      const content = data.content || [];
+      const toolUses = content.filter(c => c.type === "tool_use");
+      const textParts = content.filter(c => c.type === "text").map(c => c.text).join("");
+      if (toolUses.length === 0) return textParts || "Done!";
+
+      msgs.push({ role: "assistant", content });
+      const toolResults = toolUses.map(tu => {
+        onTrace(tu.name, tu.input);
+        const result = executeTool(tu.name, tu.input);
+        return { type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(result) };
+      });
+      msgs.push({ role: "user", content: toolResults });
+    }
+    return "I've completed the requested actions.";
+  };
+
+  const runGroqAgent = async (userText, history, onTrace) => {
+    const sysPrompt = buildSystemPrompt();
+    let msgs = [{ role: "system", content: sysPrompt }];
+    history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
+    msgs.push({ role: "user", content: userText });
+    const tools = groqToolSchema();
+
+    for (let step = 0; step < 6; step++) {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, tools, tool_choice: "auto", max_tokens: 1024 })
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Groq API error: " + r.status); }
+      const data = await r.json();
+      const msg = data.choices?.[0]?.message;
+      if (!msg) throw new Error("Empty response from Groq.");
+      if (msg.tool_calls && msg.tool_calls.length) {
+        msgs.push(msg);
+        msg.tool_calls.forEach(tc => {
+          let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (e) {}
+          onTrace(tc.function.name, args);
+          const result = executeTool(tc.function.name, args);
+          msgs.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
+        });
+        continue;
+      }
+      return msg.content || "Done!";
+    }
+    return "I've completed the requested actions.";
+  };
+
+  const runGeminiAgent = async (userText, history, onTrace) => {
+    const sysPrompt = buildSystemPrompt();
+    let contents = [];
     history.forEach(m => {
       if (m.role === "user") contents.push({ role: "user", parts: [{ text: m.text }] });
       else if (m.role === "assistant") contents.push({ role: "model", parts: [{ text: m.text }] });
     });
     contents.push({ role: "user", parts: [{ text: userText }] });
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents })
-    });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Gemini API error: " + r.status); }
-    const data = await r.json();
-    const parts = data.candidates?.[0]?.content?.parts;
-    if (!parts || !parts.length) throw new Error("Empty response from Gemini.");
-    return parts.map(p => p.text || "").join("");
-  };
+    const tools = geminiToolSchema();
 
-  const callGroq = async (userText, history) => {
-    const sysPrompt = buildSystemPrompt();
-    const msgs = [{ role: "system", content: sysPrompt }];
-    history.forEach(m => {
-      if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text });
-    });
-    msgs.push({ role: "user", content: userText });
-    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-      body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 1000 })
-    });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Groq API error: " + r.status); }
-    const data = await r.json();
-    return data.choices?.[0]?.message?.content || "No response.";
+    for (let step = 0; step < 6; step++) {
+      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ system_instruction: { parts: [{ text: sysPrompt }] }, tools, contents })
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Gemini API error: " + r.status); }
+      const data = await r.json();
+      const cand = data.candidates?.[0];
+      const parts = cand?.content?.parts || [];
+      const fnCalls = parts.filter(p => p.functionCall);
+      const textParts = parts.filter(p => p.text).map(p => p.text).join("");
+      if (fnCalls.length === 0) return textParts || "Done!";
+
+      contents.push({ role: "model", parts });
+      const responseParts = fnCalls.map(fc => {
+        onTrace(fc.functionCall.name, fc.functionCall.args || {});
+        const result = executeTool(fc.functionCall.name, fc.functionCall.args || {});
+        return { functionResponse: { name: fc.functionCall.name, response: result } };
+      });
+      contents.push({ role: "user", parts: responseParts });
+    }
+    return "I've completed the requested actions.";
   };
 
   const sendMessage = async (text) => {
@@ -582,59 +699,18 @@ DATA:\n${ctx}`;
     setInput("");
     setLoading(true);
 
+    const onTrace = (name, args) => {
+      setMessages(prev => [...prev, { role: "trace", text: "🔧 " + toolLabel(name, args) }]);
+    };
+
     try {
-      // Build clean history (skip the initial welcome message)
       const history = messages.slice(1).filter(m => m.role === "user" || m.role === "assistant");
       let reply;
-      if (provider === "anthropic") reply = await callAnthropic(userText, history);
-      else if (provider === "gemini") reply = await callGemini(userText, history);
-      else reply = await callGroq(userText, history);
+      if (provider === "anthropic") reply = await runAnthropicAgent(userText, history, onTrace);
+      else if (provider === "gemini") reply = await runGeminiAgent(userText, history, onTrace);
+      else reply = await runGroqAgent(userText, history, onTrace);
 
-      // Parse actions - flexible matching for different AI model output formats
-      let actionJson = null;
-      let actionMatch = reply.match(/<action>([\s\S]*?)<\/action>/);
-      if (!actionMatch) actionMatch = reply.match(/[\(\[\?]action>?([\s\S]*?)<?\/?action[\)\]]?>?/i);
-      if (!actionMatch) {
-        const jsonMatch = reply.match(/\{[\s\S]*?"type"\s*:\s*"(task|log|milestone|project)"[\s\S]*?\}/);
-        if (jsonMatch) actionMatch = [jsonMatch[0], jsonMatch[0]];
-      }
-      if (actionMatch) {
-        try {
-          let jsonStr = actionMatch[1].trim();
-          // Clean stray characters some models add
-          jsonStr = jsonStr.replace(/^[>\)\]]+|[<\(\[]+$/g, "").trim();
-          const action = JSON.parse(jsonStr);
-          if (action.projectName && !action.projectId) {
-            const match = projects.find(p => p.name.toLowerCase().includes(action.projectName.toLowerCase()));
-            if (match) action.projectId = match.id;
-          }
-          if (action.type === "project" && (action.name || action.title)) {
-            const newProj = {
-              id: uid(), name: action.name || action.title, description: action.description || "",
-              owner: action.owner || action.stakeholder || "", startDate: todayStr(),
-              targetEnd: action.targetEnd || action.deadline || "",
-              color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)],
-              createdAt: todayStr()
-            };
-            onAddProject(newProj);
-            actionJson = { type: "project", title: newProj.name };
-          } else if (action.type === "task" && action.title) {
-            onAddTask({ ...action, id: uid(), createdAt: todayStr(), updatedAt: todayStr(), description: "", remarks: "", source: action.source || "Self", projectId: action.projectId || "" });
-            actionJson = action;
-          } else if (action.type === "log" && action.activity) {
-            onAddLog({ ...action, id: uid(), date: todayStr(), projectId: action.projectId || "" });
-            actionJson = action;
-          } else if (action.type === "milestone" && action.title) {
-            onAddMilestone({ ...action, id: uid(), notes: "" });
-            actionJson = action;
-          }
-        } catch (e) { console.error("Action parse error:", e, actionMatch[1]); }
-        reply = reply.replace(/[\(\[\?]?action>?[\s\S]*?<?\/?action[\)\]]?>?/i, "").trim();
-        reply = reply.replace(/\{[\s\S]*?"type"\s*:\s*"(task|log|milestone|project)"[\s\S]*?\}/, "").trim();
-      }
-      if (!reply && actionJson) reply = "Done! I've added the " + actionJson.type + ": \"" + (actionJson.title || actionJson.activity) + "\"";
-      if (!reply) reply = "Done!";
-      setMessages(prev => [...prev, { role: "assistant", text: reply }]);
+      setMessages(prev => [...prev, { role: "assistant", text: reply || "Done!" }]);
     } catch (e) {
       console.error("AI error:", e);
       setMessages(prev => [...prev, { role: "assistant", text: "⚠️ Error: " + (e.message || "Connection failed. Please check your API key and try again.") }]);
@@ -729,6 +805,13 @@ DATA:\n${ctx}`;
       <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #E2E8F0", overflow: "hidden" }}>
         <div style={{ height: 400, overflowY: "auto", padding: "16px 20px" }}>
           {messages.map((m, i) => (
+            m.role === "trace" ? (
+              <div key={i} style={{ display: "flex", justifyContent: "flex-start", marginBottom: 8 }}>
+                <div style={{ padding: "5px 12px", borderRadius: 8, background: "#FFF7ED", border: "1px solid #FED7AA", fontSize: 11, color: "#C2410C", fontWeight: 600 }}>
+                  {m.text}
+                </div>
+              </div>
+            ) : (
             <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", marginBottom: 12 }}>
               <div style={{
                 maxWidth: "80%", padding: "10px 16px", borderRadius: 14,
@@ -742,6 +825,7 @@ DATA:\n${ctx}`;
                 {String(m.text || "")}
               </div>
             </div>
+            )
           ))}
           {loading && (
             <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 12 }}>
@@ -1046,6 +1130,7 @@ function App(){
         {view==="ai"&&<AIAssistant projects={projects} tasks={tasks} logs={logs} milestones={milestones}
           onAddProject={p=>{update(setProjects,"projects",[...projects,p]);}}
           onAddTask={t=>{update(setTasks,"tasks",[...tasks,t]);}}
+          onUpdateTask={t=>{update(setTasks,"tasks",tasks.map(x=>x.id===t.id?t:x));}}
           onAddLog={l=>{update(setLogs,"logs",[l,...logs]);}}
           onAddMilestone={m=>{update(setMilestones,"milestones",[...milestones,m]);}} />}
 
