@@ -1167,7 +1167,35 @@ function LogForm({projects,onSave,onCancel,defaultProject}){
 }
 function MilestoneForm({projects,onSave,onCancel,defaultProject}){const[f,setF]=useState({title:"",projectId:defaultProject||"",targetDate:"",status:"Not Started",progress:0,notes:""});const set=(k,v)=>setF(p=>({...p,[k]:v}));return<><div className="field"><label className="field-label">Milestone *</label><input className="field-input" value={f.title} onChange={e=>set("title",e.target.value)}/></div><div className="grid-2"><div className="field"><label className="field-label">Project</label><select className="field-input" value={f.projectId} onChange={e=>set("projectId",e.target.value)}><option value="">— General —</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div><div className="field"><label className="field-label">Target Date</label><input type="date" className="field-input" value={f.targetDate} onChange={e=>set("targetDate",e.target.value)}/></div><div className="field"><label className="field-label">Status</label><select className="field-input" value={f.status} onChange={e=>set("status",e.target.value)}>{["Not Started","In Progress","On Hold","Completed"].map(s=><option key={s}>{s}</option>)}</select></div><div className="field"><label className="field-label">Progress: {f.progress}%</label><input type="range" min={0} max={100} step={5} value={f.progress} onChange={e=>set("progress",+e.target.value)} style={{width:"100%"}}/></div></div><div className="field"><label className="field-label">Notes</label><textarea className="field-input" style={{minHeight:42}} value={f.notes} onChange={e=>set("notes",e.target.value)}/></div><div className="btn-row"><button className="btn btn-secondary" onClick={onCancel}>Cancel</button><button className="btn btn-primary" onClick={()=>f.title.trim()&&onSave({...f,id:uid()})}>Add Milestone</button></div></>;}
 
-function SetupScreen({onDone}){const[token,setToken]=useState("");const[testing,setTesting]=useState(false);const[error,setError]=useState("");const go=async()=>{if(!token.trim())return;setTesting(true);setError("");const ok=await gh.testToken(token.trim());if(ok){localStorage.setItem("gh_token",token.trim());onDone();}else setError("Token can't access repo.");setTesting(false);};return<div className="setup-screen"><div className="setup-card"><div style={{fontSize:48,marginBottom:16}}>🔐</div><h1 style={{fontSize:22,fontWeight:800,marginBottom:8}}>Connect to GitHub</h1><p style={{color:"#64748B",fontSize:14,marginBottom:24,lineHeight:1.5}}>Data syncs to <b>{REPO}</b>. Token stays in this browser only.</p><div className="field"><input className="field-input" value={token} onChange={e=>setToken(e.target.value)} placeholder="ghp_xxxxxxxxxxxx" style={{textAlign:"center",fontSize:15}}/></div>{error&&<div style={{color:"#DC2626",fontSize:13,marginBottom:12}}>{error}</div>}<button className="btn btn-primary" onClick={go} disabled={testing} style={{width:"100%",padding:14,fontSize:15}}>{testing?"Verifying...":"Connect & Start"}</button></div></div>;}
+function SetupScreen({onDone}){
+  const[token,setToken]=useState("");const[testing,setTesting]=useState(false);const[error,setError]=useState("");
+  const go=async()=>{if(!token.trim())return;setTesting(true);setError("");const ok=await gh.testToken(token.trim());if(ok){localStorage.setItem("gh_token",token.trim());onDone();}else setError("Token can't access repo. Make sure you generated it with the 'repo' checkbox ticked, then try again.");setTesting(false);};
+  const tokenUrl = "https://github.com/settings/tokens/new?scopes=repo&description=" + encodeURIComponent("Project Command Center — " + REPO);
+  return<div className="setup-screen"><div className="setup-card">
+    <div style={{fontSize:48,marginBottom:16}}>🔐</div>
+    <h1 style={{fontSize:22,fontWeight:800,marginBottom:8}}>Connect to GitHub</h1>
+    <p style={{color:"#64748B",fontSize:14,marginBottom:20,lineHeight:1.5}}>Data syncs to <b>{REPO}</b>. Your token stays in this browser only — it's never sent anywhere except GitHub's API.</p>
+
+    <a href={tokenUrl} target="_blank" rel="noopener" style={{textDecoration:"none"}}>
+      <button className="btn btn-primary" style={{width:"100%",padding:14,fontSize:15,marginBottom:10}}>
+        ⚡ Generate token automatically →
+      </button>
+    </a>
+    <p style={{color:"#94A3B8",fontSize:11,marginBottom:20,lineHeight:1.5}}>
+      Opens GitHub with the correct permissions already selected.<br/>Just click the green <b>"Generate token"</b> button at the bottom of that page, then copy the result back here.
+    </p>
+
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+      <div style={{flex:1,height:1,background:"#E2E8F0"}}/>
+      <span style={{fontSize:11,color:"#94A3B8"}}>then paste it below</span>
+      <div style={{flex:1,height:1,background:"#E2E8F0"}}/>
+    </div>
+
+    <div className="field"><input className="field-input" value={token} onChange={e=>setToken(e.target.value)} placeholder="ghp_xxxxxxxxxxxx" style={{textAlign:"center",fontSize:15}} onKeyDown={e=>{if(e.key==="Enter")go();}}/></div>
+    {error&&<div style={{color:"#DC2626",fontSize:13,marginBottom:12}}>{error}</div>}
+    <button className="btn btn-primary" onClick={go} disabled={testing} style={{width:"100%",padding:14,fontSize:15}}>{testing?"Verifying...":"Connect & Start"}</button>
+  </div></div>;
+}
 
 /* ═══ MAIN APP ═══ */
 function App(){
