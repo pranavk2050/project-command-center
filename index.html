@@ -152,11 +152,13 @@ function Ring({pct,size=54,stroke=5,color}){const r=(size-stroke)/2,c=2*Math.PI*
 function Modal({title,onClose,children}){return<div className="modal-overlay" onClick={onClose}><div className="modal-box" onClick={e=>e.stopPropagation()}><div className="modal-header"><h2 className="modal-title">{title}</h2><button className="modal-close" onClick={onClose}>&times;</button></div>{children}</div></div>;}
 
 /* ═══════════════════════════════════════════
-   INTERACTIVE EXPANDABLE MINDMAP
+/* ═══════════════════════════════════════════
+   INTERACTIVE EXPANDABLE MINDMAP v2
+   Pan, Zoom, No Overlaps
    ═══════════════════════════════════════════ */
-const NODE_H = 36;
-const LEVEL_W = 200;
-const ROOT_EXTRA = 12;
+const NODE_H = 40;
+const NODE_GAP = 6;
+const LEVEL_W = 220;
 
 function buildJourneyTree(projects, tasks, milestones) {
   return {
@@ -176,7 +178,8 @@ function buildJourneyTree(projects, tasks, milestones) {
       const statusChildren = Object.entries(groups).map(([status, items]) => ({
         id: p.id + "-" + status, label: status, sub: items.length + " tasks", color: SC[status] || "#64748B",
         children: items.map(t => ({
-          id: t.id, label: t.title, sub: (t.deadline ? fmtDate(t.deadline) : "") + (t.assignedBy ? " • " + t.assignedBy : ""),
+          id: t.id, label: t.title.length > 32 ? t.title.slice(0,32) + "…" : t.title,
+          sub: (t.deadline ? fmtDate(t.deadline) : "") + (t.assignedBy ? " • " + t.assignedBy : ""),
           color: SC[status] || "#64748B", isLeaf: true, priority: t.priority
         }))
       }));
@@ -184,14 +187,12 @@ function buildJourneyTree(projects, tasks, milestones) {
         statusChildren.push({
           id: p.id + "-milestones", label: "Milestones", sub: pM.length + " items", color: "#7C3AED",
           children: pM.map(m => ({
-            id: m.id, label: m.title, sub: m.progress + "% • " + fmtDate(m.targetDate), color: "#7C3AED", isLeaf: true
+            id: m.id, label: m.title.length > 32 ? m.title.slice(0,32) + "…" : m.title,
+            sub: m.progress + "% • " + fmtDate(m.targetDate), color: "#7C3AED", isLeaf: true
           }))
         });
       }
-      return {
-        id: p.id, label: p.name, sub: pct + "% • " + pT.length + " tasks", color: p.color,
-        children: statusChildren
-      };
+      return { id: p.id, label: p.name, sub: pct + "% • " + pT.length + " tasks", color: p.color, children: statusChildren };
     })
   };
 }
@@ -208,45 +209,47 @@ function buildProjectTree(project, tasks, milestones, logs) {
   const children = Object.entries(groups).map(([status, items]) => ({
     id: project.id + "-" + status, label: status, sub: items.length + " tasks", color: SC[status] || "#64748B",
     children: items.map(t => ({
-      id: t.id, label: t.title, sub: [t.priority, t.deadline ? fmtDate(t.deadline) : "", t.assignedBy ? "By: " + t.assignedBy : ""].filter(Boolean).join(" • "),
+      id: t.id, label: t.title.length > 35 ? t.title.slice(0,35) + "…" : t.title,
+      sub: [t.priority, t.deadline ? fmtDate(t.deadline) : "", t.assignedBy ? "By: " + t.assignedBy : ""].filter(Boolean).join(" • "),
       color: SC[status] || "#64748B", isLeaf: true, priority: t.priority
     }))
   }));
-  if (milestones.length) {
-    children.push({
-      id: project.id + "-ms", label: "Milestones", sub: milestones.length, color: "#7C3AED",
-      children: milestones.map(m => ({ id: m.id, label: m.title, sub: m.progress + "% • " + (m.status), color: "#7C3AED", isLeaf: true }))
-    });
-  }
-  if (logs.length) {
-    children.push({
-      id: project.id + "-logs", label: "Activity Log", sub: logs.length + " entries", color: "#8B5CF6",
-      children: logs.slice(0, 15).map(l => ({ id: l.id, label: l.activity.slice(0, 40), sub: fmtDate(l.date) + (l.duration ? " • " + l.duration : ""), color: "#8B5CF6", isLeaf: true }))
-    });
-  }
-  return {
-    id: "proj-root", label: project.name, sub: pct + "% complete", color: project.color, isRoot: true, children
-  };
+  if (milestones.length) children.push({ id: project.id + "-ms", label: "Milestones", sub: milestones.length, color: "#7C3AED", children: milestones.map(m => ({ id: m.id, label: m.title.length > 35 ? m.title.slice(0,35) + "…" : m.title, sub: m.progress + "% • " + m.status, color: "#7C3AED", isLeaf: true })) });
+  if (logs.length) children.push({ id: project.id + "-logs", label: "Activity Log", sub: logs.length + " entries", color: "#8B5CF6", children: logs.slice(0,20).map(l => ({ id: l.id, label: l.activity.length > 38 ? l.activity.slice(0,38) + "…" : l.activity, sub: fmtDate(l.date) + (l.duration ? " • " + l.duration : ""), color: "#8B5CF6", isLeaf: true })) });
+  return { id: "proj-root", label: project.name, sub: pct + "% complete", color: project.color, isRoot: true, children };
 }
 
-function calcLayout(node, expanded, startY, level, side) {
-  const items = [];
-  const x = level * LEVEL_W * side;
-  if (!node.children || !node.children.length || !expanded.has(node.id)) {
-    items.push({ ...node, x, y: startY, level });
-    return { items, height: NODE_H };
+// Proper tree layout: returns { items, totalHeight }
+function layoutTree(node, expanded, yStart, level) {
+  const result = [];
+  const x = level * LEVEL_W;
+  const hasVisibleChildren = node.children && node.children.length > 0 && expanded.has(node.id);
+
+  if (!hasVisibleChildren) {
+    result.push({ ...node, x, y: yStart, level });
+    return { items: result, totalHeight: NODE_H };
   }
-  let totalChildH = 0;
-  const childLayouts = [];
-  for (const child of node.children) {
-    const cl = calcLayout(child, expanded, startY + totalChildH, level + 1, side);
-    childLayouts.push(cl);
-    totalChildH += cl.height;
+
+  // Layout children first to know total height
+  let childY = yStart;
+  const childResults = [];
+  for (let i = 0; i < node.children.length; i++) {
+    const cl = layoutTree(node.children[i], expanded, childY, level + 1);
+    childResults.push(cl);
+    childY += cl.totalHeight;
+    if (i < node.children.length - 1) childY += NODE_GAP;
   }
-  const nodeY = startY + totalChildH / 2 - NODE_H / 2;
-  items.push({ ...node, x, y: nodeY, level });
-  childLayouts.forEach(cl => items.push(...cl.items));
-  return { items, height: Math.max(totalChildH, NODE_H) };
+  const totalChildH = childY - yStart;
+
+  // Parent centered among children
+  const firstChildY = childResults[0].items[0].y;
+  const lastChild = childResults[childResults.length - 1].items[0];
+  const parentY = (firstChildY + lastChild.y) / 2;
+
+  result.push({ ...node, x, y: parentY, level });
+  childResults.forEach(cr => result.push(...cr.items));
+
+  return { items: result, totalHeight: Math.max(totalChildH, NODE_H) };
 }
 
 function InteractiveMindMap({ tree, title }) {
@@ -255,6 +258,12 @@ function InteractiveMindMap({ tree, title }) {
     if (tree.children) tree.children.forEach(c => s.add(c.id));
     return s;
   });
+
+  // Pan & Zoom state
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [scale, setScale] = useState(1);
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef(null);
 
   const toggle = id => {
@@ -268,67 +277,85 @@ function InteractiveMindMap({ tree, title }) {
   const expandAll = () => {
     const s = new Set();
     const walk = n => { s.add(n.id); if (n.children) n.children.forEach(walk); };
-    walk(tree);
+    walk(tree); setExpanded(s);
+  };
+  const collapseAll = () => {
+    const s = new Set(["root", "proj-root"]);
+    if (tree.children) tree.children.forEach(c => s.add(c.id));
     setExpanded(s);
   };
-  const collapseAll = () => setExpanded(new Set(["root", "proj-root"]));
+  const resetView = () => { setPan({ x: 0, y: 0 }); setScale(1); };
+  const zoomIn = () => setScale(s => Math.min(s * 1.25, 3));
+  const zoomOut = () => setScale(s => Math.max(s / 1.25, 0.25));
 
-  // Layout: root center, right side children (split if needed)
-  const allNodes = useMemo(() => {
-    if (!tree.children || !tree.children.length) return [{ ...tree, x: 0, y: 0, level: 0 }];
+  // Mouse/touch pan handlers
+  const onPointerDown = e => {
+    if (e.target.closest('.mm-pill')) return; // don't pan when clicking nodes
+    setDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+    e.currentTarget.style.cursor = 'grabbing';
+  };
+  const onPointerMove = e => {
+    if (!dragging) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setPan({ x: dragStart.current.panX + dx, y: dragStart.current.panY + dy });
+  };
+  const onPointerUp = e => {
+    setDragging(false);
+    if (e.currentTarget) e.currentTarget.style.cursor = 'grab';
+  };
+  const onWheel = e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.92 : 1.08;
+    setScale(s => Math.min(Math.max(s * delta, 0.2), 3));
+  };
 
-    // Split children into right side
-    let totalH = 0;
-    const childLayouts = [];
-    for (const child of tree.children) {
-      const cl = calcLayout(child, expanded, totalH, 1, 1);
-      childLayouts.push(cl);
-      totalH += cl.height;
+  // Layout computation
+  const { allNodes, canvasW, canvasH, offsetX, offsetY } = useMemo(() => {
+    if (!tree.children || !tree.children.length) {
+      return { allNodes: [{ ...tree, x: 0, y: 0, level: 0 }], canvasW: 300, canvasH: 100, offsetX: 40, offsetY: 50 };
     }
-    const rootY = totalH / 2 - NODE_H / 2;
-    const nodes = [{ ...tree, x: 0, y: rootY, level: 0 }];
-    childLayouts.forEach(cl => nodes.push(...cl.items));
-    return nodes;
+    const layout = layoutTree(tree, expanded, 0, 0);
+    const nodes = layout.items;
+    const minX = Math.min(...nodes.map(n => n.x));
+    const maxX = Math.max(...nodes.map(n => n.x));
+    const minY = Math.min(...nodes.map(n => n.y));
+    const maxY = Math.max(...nodes.map(n => n.y));
+    const padX = 60, padY = 40, nodeW = 200;
+    return {
+      allNodes: nodes,
+      canvasW: (maxX - minX) + nodeW + padX * 2,
+      canvasH: (maxY - minY) + NODE_H + padY * 2,
+      offsetX: -minX + padX,
+      offsetY: -minY + padY
+    };
   }, [tree, expanded]);
 
-  // Compute bounds
-  const minX = Math.min(...allNodes.map(n => n.x)) - 120;
-  const maxX = Math.max(...allNodes.map(n => n.x)) + 260;
-  const minY = Math.min(...allNodes.map(n => n.y)) - 30;
-  const maxY = Math.max(...allNodes.map(n => n.y)) + NODE_H + 30;
-  const canvasW = maxX - minX;
-  const canvasH = maxY - minY;
-  const offsetX = -minX;
-  const offsetY = -minY;
-
-  // Build parent map for lines
+  // Parent map for drawing lines
   const parentMap = useMemo(() => {
     const m = {};
-    const walk = (node) => {
+    const walk = node => {
       if (node.children && expanded.has(node.id)) {
         node.children.forEach(c => { m[c.id] = node.id; walk(c); });
       }
     };
-    walk(tree);
-    return m;
+    walk(tree); return m;
   }, [tree, expanded]);
 
   const nodeById = useMemo(() => {
-    const m = {};
-    allNodes.forEach(n => m[n.id] = n);
-    return m;
+    const m = {}; allNodes.forEach(n => m[n.id] = n); return m;
   }, [allNodes]);
 
-  // SVG lines
   const lines = useMemo(() => {
     return allNodes.filter(n => parentMap[n.id] && nodeById[parentMap[n.id]]).map(n => {
       const parent = nodeById[parentMap[n.id]];
-      const px = parent.x + offsetX + (parent.isRoot ? 80 : 70);
+      const px = parent.x + offsetX + (parent.isRoot ? 90 : 75);
       const py = parent.y + offsetY + NODE_H / 2;
-      const cx_ = n.x + offsetX - 6;
+      const cx_ = n.x + offsetX - 4;
       const cy_ = n.y + offsetY + NODE_H / 2;
-      const mx = (px + cx_) / 2;
-      return { key: n.id, d: `M${px},${py} C${mx},${py} ${mx},${cy_} ${cx_},${cy_}`, color: n.color };
+      const cpx = px + (cx_ - px) * 0.5;
+      return { key: n.id, d: `M${px},${py} C${cpx},${py} ${cpx},${cy_} ${cx_},${cy_}`, color: n.color };
     });
   }, [allNodes, parentMap, nodeById, offsetX, offsetY]);
 
@@ -336,15 +363,33 @@ function InteractiveMindMap({ tree, title }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
         <h2 style={{ fontSize: 16, fontWeight: 800 }}>{title}</h2>
-        <div style={{ display: "flex", gap: 8 }} className="no-print">
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }} className="no-print">
           <button className="btn btn-secondary btn-sm" onClick={expandAll}>Expand All</button>
-          <button className="btn btn-secondary btn-sm" onClick={collapseAll}>Collapse All</button>
+          <button className="btn btn-secondary btn-sm" onClick={collapseAll}>Collapse</button>
+          <span style={{ width: 1, height: 20, background: "#E2E8F0" }} />
+          <button className="btn btn-secondary btn-sm" onClick={zoomIn}>🔍+</button>
+          <button className="btn btn-secondary btn-sm" onClick={zoomOut}>🔍−</button>
+          <button className="btn btn-secondary btn-sm" onClick={resetView}>Reset</button>
+          <span style={{ fontSize: 11, color: "#94A3B8", minWidth: 40 }}>{Math.round(scale * 100)}%</span>
         </div>
       </div>
-      <div className="mm-container" ref={containerRef}>
-        <div className="mm-canvas" style={{ width: canvasW, height: canvasH }}>
-          <svg className="mm-svg" width={canvasW} height={canvasH}>
-            {lines.map(l => <path key={l.key} d={l.d} fill="none" stroke={l.color} strokeWidth="1.8" opacity="0.35" />)}
+      <div className="mm-container" style={{ height: 500, cursor: dragging ? 'grabbing' : 'grab', overflow: 'hidden', touchAction: 'none' }}
+        ref={containerRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+        onWheel={onWheel}>
+        <div style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+          transformOrigin: '0 0',
+          position: 'relative',
+          width: canvasW,
+          height: canvasH,
+          transition: dragging ? 'none' : 'transform 0.15s ease-out'
+        }}>
+          <svg style={{ position: 'absolute', top: 0, left: 0, width: canvasW, height: canvasH, pointerEvents: 'none', overflow: 'visible' }}>
+            {lines.map(l => <path key={l.key} d={l.d} fill="none" stroke={l.color} strokeWidth="2" opacity="0.3" />)}
           </svg>
           {allNodes.map(n => {
             const hasChildren = n.children && n.children.length > 0;
@@ -352,38 +397,61 @@ function InteractiveMindMap({ tree, title }) {
             const nx = n.x + offsetX;
             const ny = n.y + offsetY;
             return (
-              <div key={n.id} className="mm-node" style={{ left: nx, top: ny }}
-                onClick={e => { e.stopPropagation(); if (hasChildren) toggle(n.id); }}>
-                <div className={"mm-pill " + (n.isRoot ? "mm-root" : n.isLeaf ? "mm-leaf" : "")}
-                  style={{ background: n.color + "12", borderColor: n.color + "50", color: n.color }}>
+              <div key={n.id} style={{
+                position: 'absolute', left: nx, top: ny, height: NODE_H,
+                display: 'flex', alignItems: 'center', zIndex: 2, whiteSpace: 'nowrap'
+              }}>
+                <div className="mm-pill" onClick={e => { e.stopPropagation(); if (hasChildren) toggle(n.id); }}
+                  style={{
+                    background: n.isRoot ? n.color + '18' : n.isLeaf ? '#fff' : n.color + '10',
+                    borderColor: n.color + (n.isLeaf ? '40' : '60'),
+                    color: n.color,
+                    padding: n.isRoot ? '8px 20px' : n.isLeaf ? '4px 12px' : '5px 14px',
+                    fontSize: n.isRoot ? 14 : n.isLeaf ? 11 : 12,
+                    fontWeight: n.isRoot ? 800 : n.isLeaf ? 600 : 700,
+                    borderRadius: n.isRoot ? 14 : 9,
+                    borderWidth: n.isRoot ? 2.5 : n.isLeaf ? 1.5 : 2,
+                    cursor: hasChildren ? 'pointer' : 'default',
+                    boxShadow: n.isRoot ? '0 4px 16px ' + n.color + '20' : 'none',
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    userSelect: 'none',
+                    transition: 'box-shadow .15s, background .15s'
+                  }}
+                  onMouseEnter={e => { if (!n.isLeaf) e.currentTarget.style.boxShadow = '0 4px 20px ' + n.color + '25'; }}
+                  onMouseLeave={e => { if (!n.isRoot) e.currentTarget.style.boxShadow = 'none'; }}>
                   {hasChildren && (
-                    <span className="mm-toggle" style={{ background: n.color }}>
-                      {isExp ? "−" : "+"}
-                    </span>
+                    <span style={{
+                      width: 20, height: 20, borderRadius: '50%', background: n.color,
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, fontWeight: 800, flexShrink: 0, lineHeight: 1
+                    }}>{isExp ? '−' : '+'}</span>
                   )}
                   {n.isLeaf && n.priority && (
                     <span style={{
-                      width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-                      background: n.priority === "High" ? "#EF4444" : n.priority === "Medium" ? "#F59E0B" : "#3B82F6"
+                      width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                      background: n.priority === 'High' ? '#EF4444' : n.priority === 'Medium' ? '#F59E0B' : '#3B82F6'
                     }} />
                   )}
                   <span>{n.label}</span>
-                  {hasChildren && !n.isRoot && <span className="mm-count">({n.children.length})</span>}
-                  {n.sub && <span className="mm-detail">{n.sub}</span>}
+                  {hasChildren && !n.isRoot && <span style={{ fontSize: 10, opacity: 0.6 }}>({n.children.length})</span>}
+                  {n.sub && <span style={{ fontSize: n.isLeaf ? 9 : 10, color: '#94A3B8', fontWeight: 500, marginLeft: 3 }}>{n.sub}</span>}
                 </div>
               </div>
             );
           })}
         </div>
-        <div className="mm-hint no-print">Click nodes to expand / collapse</div>
+        <div style={{ position: 'absolute', bottom: 10, left: 16, fontSize: 11, color: '#94A3B8', zIndex: 5, pointerEvents: 'none' }} className="no-print">
+          Drag to pan • Scroll to zoom • Click nodes to expand
+        </div>
       </div>
       <div className="mm-legend">
-        <span><span className="mm-legend-dot" style={{ background: "#059669" }} /> Completed</span>
-        <span><span className="mm-legend-dot" style={{ background: "#2563EB" }} /> In Progress</span>
-        <span><span className="mm-legend-dot" style={{ background: "#94A3B8" }} /> Not Started</span>
-        <span><span className="mm-legend-dot" style={{ background: "#D97706" }} /> On Hold</span>
-        <span><span className="mm-legend-dot" style={{ background: "#DC2626" }} /> Overdue</span>
-        <span><span className="mm-legend-dot" style={{ background: "#7C3AED" }} /> Milestones</span>
+        <span><span className="mm-legend-dot" style={{background:"#059669"}}/> Completed</span>
+        <span><span className="mm-legend-dot" style={{background:"#2563EB"}}/> In Progress</span>
+        <span><span className="mm-legend-dot" style={{background:"#94A3B8"}}/> Not Started</span>
+        <span><span className="mm-legend-dot" style={{background:"#D97706"}}/> On Hold</span>
+        <span><span className="mm-legend-dot" style={{background:"#DC2626"}}/> Overdue</span>
+        <span><span className="mm-legend-dot" style={{background:"#7C3AED"}}/> Milestones</span>
+        <span style={{marginLeft:8}}>● <span style={{fontSize:10}}>Priority:</span> <span style={{color:"#EF4444"}}>High</span> <span style={{color:"#F59E0B"}}>Med</span> <span style={{color:"#3B82F6"}}>Low</span></span>
       </div>
     </div>
   );
