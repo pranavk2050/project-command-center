@@ -19,6 +19,16 @@
       "color": "#DC2626",
       "id": "mrj3bl7yk558j",
       "createdAt": "2026-07-13"
+    },
+    {
+      "id": "mrjfr0o53a35p",
+      "name": "Risk Summary Tool",
+      "description": "A project to develop a risk summary tool",
+      "owner": "Pranav Kulkarni",
+      "startDate": "2026-07-13",
+      "targetEnd": "2026-12-31",
+      "color": "#0891B2",
+      "createdAt": "2026-07-13"
     }
   ],
   "tasks": [
@@ -83,21 +93,6 @@
     },
     {
       "type": "task",
-      "title": "Initiate Project",
-      "projectId": "mrj39rr3iu2j3",
-      "priority": "Low",
-      "status": "Not Started",
-      "deadline": "2026-08-31",
-      "assignedBy": "Pranav Kulkarni",
-      "source": "Self",
-      "id": "mrj6v0bhlrl11",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13",
-      "description": "",
-      "remarks": ""
-    },
-    {
-      "type": "task",
       "title": "Integrate order of precedence to main prompt",
       "projectId": "mrj39rr4iu2j5",
       "priority": "High",
@@ -106,6 +101,21 @@
       "assignedBy": "Pranav Kulkarni",
       "source": "Self",
       "id": "mrjfqaorkjqpd",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13",
+      "description": "",
+      "remarks": ""
+    },
+    {
+      "type": "task",
+      "title": "Initiate Project",
+      "projectId": "mrj39rr3iu2j3",
+      "priority": "Low",
+      "status": "Not Started",
+      "deadline": "2026-08-31",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "id": "mrj6v0bhlrl11",
       "createdAt": "2026-07-13",
       "updatedAt": "2026-07-13",
       "description": "",
@@ -144,5 +154,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T16:26:51.675Z"
+  "lastUpdated": "2026-07-13T16:27:25.349Z"
 }
