@@ -222,6 +222,20 @@
       "updatedAt": "2026-07-14"
     },
     {
+      "id": "mrkgtuydo9xpw",
+      "title": "Integration with Teceverse",
+      "description": "Integrate with Teceverse system.",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "2026-07-16",
+      "projectId": "mrj39rr1iu2j2",
+      "remarks": "",
+      "createdAt": "2026-07-14",
+      "updatedAt": "2026-07-14"
+    },
+    {
       "type": "task",
       "title": "Initiate Project",
       "projectId": "mrj39rr3iu2j3",
@@ -269,5 +283,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-14T09:45:19.598Z"
+  "lastUpdated": "2026-07-14T09:45:24.214Z"
 }
