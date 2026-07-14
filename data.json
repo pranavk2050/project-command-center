@@ -194,20 +194,6 @@
       "updatedAt": "2026-07-14"
     },
     {
-      "id": "mrkgrsguw0skv",
-      "title": "Integration with Teceverse",
-      "description": "Integrate EGA system with Teceverse platform for enhanced interoperability",
-      "assignedBy": "Pranav Kulkarni",
-      "source": "Self",
-      "priority": "High",
-      "status": "Not Started",
-      "deadline": "2026-07-31",
-      "projectId": "mrj39rr1iu2j2",
-      "remarks": "",
-      "createdAt": "2026-07-14",
-      "updatedAt": "2026-07-14"
-    },
-    {
       "id": "mrkgtreekofiq",
       "title": "Indoor plant video sample: person talking on phone detection",
       "description": "Create indoor plant video sample for person talking on phone detection.",
@@ -283,5 +269,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-14T09:45:24.214Z"
+  "lastUpdated": "2026-07-14T09:57:21.989Z"
 }
