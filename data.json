@@ -31,7 +31,10 @@
       "startDate": "2026-07-13",
       "targetEnd": "2026-12-31",
       "color": "#4F46E5",
-      "createdAt": "2026-07-13"
+      "createdAt": "2026-07-13",
+      "valueCategory": "Cost Savings / Efficiency",
+      "valueStatement": "Digitizing Process & Instrumentation Diagrams (P&IDs) will streamline design and operational processes, reducing errors and improving documentation integrity.",
+      "valueImpact": "$10K per annum saved"
     },
     {
       "id": "mrjhtg9zgrxoz",
@@ -224,5 +227,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-13T18:32:58.326Z"
+  "lastUpdated": "2026-07-14T03:00:29.773Z"
 }
