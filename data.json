@@ -180,6 +180,20 @@
       "updatedAt": "2026-07-13"
     },
     {
+      "id": "mrkgrpdwu12hb",
+      "title": "Indoor plant video sample: person talking on phone detection",
+      "description": "Create indoor plant video sample focusing on person talking on phone detection for EGA testing",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "2026-07-31",
+      "projectId": "mrj39rr1iu2j2",
+      "remarks": "",
+      "createdAt": "2026-07-14",
+      "updatedAt": "2026-07-14"
+    },
+    {
       "type": "task",
       "title": "Initiate Project",
       "projectId": "mrj39rr3iu2j3",
@@ -227,5 +241,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-14T03:00:29.773Z"
+  "lastUpdated": "2026-07-14T09:43:43.681Z"
 }
