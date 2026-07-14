@@ -194,6 +194,20 @@
       "updatedAt": "2026-07-14"
     },
     {
+      "id": "mrkgrsguw0skv",
+      "title": "Integration with Teceverse",
+      "description": "Integrate EGA system with Teceverse platform for enhanced interoperability",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "priority": "High",
+      "status": "Not Started",
+      "deadline": "2026-07-31",
+      "projectId": "mrj39rr1iu2j2",
+      "remarks": "",
+      "createdAt": "2026-07-14",
+      "updatedAt": "2026-07-14"
+    },
+    {
       "type": "task",
       "title": "Initiate Project",
       "projectId": "mrj39rr3iu2j3",
@@ -241,5 +255,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-14T09:43:43.681Z"
+  "lastUpdated": "2026-07-14T09:43:47.680Z"
 }
