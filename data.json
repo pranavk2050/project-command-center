@@ -152,20 +152,6 @@
       "updatedAt": "2026-07-13"
     },
     {
-      "id": "mrjgx6gvbb2em",
-      "title": "Plan Deployment Strategy and Schedule",
-      "description": "",
-      "assignedBy": "",
-      "source": "Self",
-      "priority": "High",
-      "status": "Not Started",
-      "deadline": "",
-      "projectId": "mrj3bl7yk558j",
-      "remarks": "",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13"
-    },
-    {
       "id": "mrkgtreekofiq",
       "title": "Indoor plant video sample: person talking on phone detection",
       "description": "Create indoor plant video sample for person talking on phone detection.",
@@ -241,5 +227,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-15T05:03:04.670Z"
+  "lastUpdated": "2026-07-15T05:03:05.589Z"
 }
