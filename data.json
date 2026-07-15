@@ -193,6 +193,20 @@
       "updatedAt": "2026-07-13",
       "description": "",
       "remarks": ""
+    },
+    {
+      "title": "Sim Ready Asset Creation",
+      "description": "Create Single Sim Ready Asset",
+      "assignedBy": "Self",
+      "source": "Email",
+      "priority": "Medium",
+      "status": "In Progress",
+      "deadline": "2026-07-16",
+      "projectId": "mrjj1jnsr9qxf",
+      "remarks": "",
+      "id": "mrlm8cy054182",
+      "createdAt": "2026-07-15",
+      "updatedAt": "2026-07-15"
     }
   ],
   "logs": [
@@ -227,5 +241,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-15T05:03:29.497Z"
+  "lastUpdated": "2026-07-15T05:04:24.964Z"
 }
