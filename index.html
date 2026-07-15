@@ -146,7 +146,7 @@ const gh = {
   token:()=>localStorage.getItem("gh_token")||"",
   headers:()=>({"Authorization":"token "+(localStorage.getItem("gh_token")||""),"Content-Type":"application/json","Accept":"application/vnd.github+json"}),
   async load(){const r=await fetch("https://api.github.com/repos/"+REPO+"/contents/"+DATA_FILE,{headers:this.headers()});if(r.status===404)return{data:null,sha:null};if(!r.ok)throw new Error("Read failed");const j=await r.json();return{data:JSON.parse(atob(j.content.replace(/\n/g,""))),sha:j.sha};},
-  async save(data,sha){const body={message:"Sync: "+new Date().toLocaleString("en-IN"),content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2))))};if(sha)body.sha=sha;const r=await fetch("https://api.github.com/repos/"+REPO+"/contents/"+DATA_FILE,{method:"PUT",headers:this.headers(),body:JSON.stringify(body)});if(!r.ok)throw new Error((await r.json()).message||"Save failed");return(await r.json()).content.sha;},
+  async save(data,sha,message){const body={message:(message||"Sync")+" — "+new Date().toLocaleString("en-IN"),content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2))))};if(sha)body.sha=sha;const r=await fetch("https://api.github.com/repos/"+REPO+"/contents/"+DATA_FILE,{method:"PUT",headers:this.headers(),body:JSON.stringify(body)});if(!r.ok)throw new Error((await r.json()).message||"Save failed");return(await r.json()).content.sha;},
   async testToken(token){try{const r=await fetch("https://api.github.com/repos/"+REPO,{headers:{"Authorization":"token "+token,"Accept":"application/vnd.github+json"}});return r.ok;}catch{return false;}}
 };
 
@@ -675,6 +675,9 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onUpdate
   });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  // Destructive tool calls land here awaiting an explicit Confirm/Cancel click
+  // instead of mutating immediately — see executeTool()'s delete_* branches.
+  const [pendingConfirm, setPendingConfirm] = useState(null);
   const chatEnd = useRef(null);
   useEffect(function() { if (chatEnd.current) chatEnd.current.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(function() { try { localStorage.setItem("ai_chat_history", JSON.stringify(messages)); } catch (e) {} }, [messages]);
@@ -798,34 +801,33 @@ DATA:\n${ctx}`;
         onUpdateTask({ ...match, status: args.newStatus, updatedAt: todayStr() });
         return { success: true, message: "Updated '" + match.title + "' to " + args.newStatus };
       }
+      // Destructive tools don't mutate here — they resolve the match, then hand back
+      // a needsConfirmation action. The actual delete only happens if/when the user
+      // clicks Confirm in the chat UI (see pendingConfirm / confirmPendingAction).
       if (name === "delete_project") {
         const matches = fuzzyMatches(projects, "name", args.projectName);
         if (matches.length === 0) return { success: false, message: "No project found matching '" + args.projectName + "'" };
         if (matches.length > 1) return { success: false, message: "Multiple projects match: " + matches.map(m => m.name).join(", ") + ". Ask the user to be more specific." };
-        onDeleteProject(matches[0].id);
-        return { success: true, message: "Deleted project '" + matches[0].name + "' and all its tasks, logs, and milestones." };
+        return { needsConfirmation: true, action: { tool: "delete_project", resolvedId: matches[0].id, itemLabel: "project \"" + matches[0].name + "\"", cascade: true } };
       }
       if (name === "delete_task") {
         const matches = fuzzyMatches(tasks, "title", args.taskTitle);
         if (matches.length === 0) return { success: false, message: "No task found matching '" + args.taskTitle + "'" };
         if (matches.length > 1) return { success: false, message: "Multiple tasks match: " + matches.map(m => m.title).join(", ") + ". Ask the user to be more specific." };
-        onDeleteTask(matches[0].id);
-        return { success: true, message: "Deleted task '" + matches[0].title + "'" };
+        return { needsConfirmation: true, action: { tool: "delete_task", resolvedId: matches[0].id, itemLabel: "task \"" + matches[0].title + "\"", cascade: false } };
       }
       if (name === "delete_log") {
         let candidates = fuzzyMatches(logs, "activity", args.activityText);
         if (args.date) candidates = candidates.filter(l => l.date === args.date);
         if (candidates.length === 0) return { success: false, message: "No log entry found matching that description." };
         if (candidates.length > 1) return { success: false, message: "Multiple log entries match. Ask the user for a date to narrow it down." };
-        onDeleteLog(candidates[0].id);
-        return { success: true, message: "Deleted log entry: '" + candidates[0].activity + "'" };
+        return { needsConfirmation: true, action: { tool: "delete_log", resolvedId: candidates[0].id, itemLabel: "log entry \"" + candidates[0].activity + "\"", cascade: false } };
       }
       if (name === "delete_milestone") {
         const matches = fuzzyMatches(milestones, "title", args.milestoneTitle);
         if (matches.length === 0) return { success: false, message: "No milestone found matching '" + args.milestoneTitle + "'" };
         if (matches.length > 1) return { success: false, message: "Multiple milestones match: " + matches.map(m => m.title).join(", ") + ". Ask the user to be more specific." };
-        onDeleteMilestone(matches[0].id);
-        return { success: true, message: "Deleted milestone '" + matches[0].title + "'" };
+        return { needsConfirmation: true, action: { tool: "delete_milestone", resolvedId: matches[0].id, itemLabel: "milestone \"" + matches[0].title + "\"", cascade: false } };
       }
       if (name === "restore_deleted_item") {
         const ghToken = localStorage.getItem("gh_token");
@@ -912,16 +914,40 @@ DATA:\n${ctx}`;
       adapter.appendAssistantTurn(messages, rawAssistantTurn);
       const results = [];
       for (const tc of toolCalls) {
+        const result = await executeTool(tc.name, tc.args);
+        if (result.needsConfirmation) {
+          // Stop the turn here — no tool result is fed back and no further model call
+          // happens. The real mutation only runs if/when the user clicks Confirm.
+          return { needsConfirmation: true, action: result.action };
+        }
         onTrace(tc.name, tc.args);
-        results.push(await executeTool(tc.name, tc.args));
+        results.push(result);
       }
       adapter.appendToolResults(messages, toolCalls, results);
     }
     return "I've completed the requested actions.";
   };
 
+  const confirmPendingAction = () => {
+    if (!pendingConfirm) return;
+    const { tool, resolvedId, itemLabel, cascade } = pendingConfirm;
+    if (tool === "delete_project") onDeleteProject(resolvedId);
+    else if (tool === "delete_task") onDeleteTask(resolvedId);
+    else if (tool === "delete_log") onDeleteLog(resolvedId);
+    else if (tool === "delete_milestone") onDeleteMilestone(resolvedId);
+    setPendingConfirm(null);
+    setMessages(prev => [...prev,
+      { role: "trace", text: "🔧 Deleting " + itemLabel },
+      { role: "assistant", text: "Deleted " + itemLabel + (cascade ? " and all its tasks, logs, and milestones" : "") + "." }
+    ]);
+  };
+  const cancelPendingAction = () => {
+    setPendingConfirm(null);
+    setMessages(prev => [...prev, { role: "assistant", text: "Cancelled — nothing was deleted." }]);
+  };
+
   const sendMessage = async (text) => {
-    if (!text.trim() || loading) return;
+    if (!text.trim() || loading || pendingConfirm) return;
     const userText = text.trim();
     setMessages(prev => [...prev, { role: "user", text: userText }]);
     setInput("");
@@ -940,7 +966,18 @@ DATA:\n${ctx}`;
       const history = fullHistory.slice(-8);
       const adapter = PROVIDER_ADAPTERS[provider] || PROVIDER_ADAPTERS.groq;
       const extra = provider === "ollama" ? { model: ollamaModel } : {};
-      let reply = await runAgentLoop(adapter, userText, history, onTrace, extra);
+      const loopResult = await runAgentLoop(adapter, userText, history, onTrace, extra);
+
+      // A destructive tool matched something but hasn't run yet — surface our own
+      // confirmation prompt (not the model's text) and wait for an explicit click.
+      if (loopResult && typeof loopResult === "object" && loopResult.needsConfirmation) {
+        const { itemLabel, cascade } = loopResult.action;
+        setPendingConfirm(loopResult.action);
+        setMessages(prev => [...prev, { role: "assistant", text: "⚠️ Delete " + itemLabel + (cascade ? " and all its tasks, logs, and milestones" : "") + "? This can't be undone from the dashboard." }]);
+        setLoading(false);
+        return;
+      }
+      let reply = loopResult;
 
       // Safety net: some smaller/free models occasionally narrate a fake success
       // ("Project X has been created") without actually calling the tool.
@@ -1065,7 +1102,7 @@ DATA:\n${ctx}`;
       {/* Quick actions */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14, alignItems: "center" }}>
         {QUICK.map(q => (
-          <button key={q} onClick={() => sendMessage(q)} disabled={loading}
+          <button key={q} onClick={() => sendMessage(q)} disabled={loading || !!pendingConfirm}
             style={{ padding: "6px 14px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0", transition: "all .15s" }}
             onMouseEnter={e => { e.currentTarget.style.background = "#1E3A5F"; e.currentTarget.style.color = "#fff"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#475569"; }}>
@@ -1113,13 +1150,21 @@ DATA:\n${ctx}`;
           <div ref={chatEnd} />
         </div>
 
+        {pendingConfirm && (
+          <div style={{ padding: "10px 16px", borderTop: "1px solid #FECACA", background: "#FEF2F2", display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "#991B1B", fontWeight: 600, marginRight: "auto" }}>⚠️ Waiting for your confirmation above</span>
+            <button className="btn btn-secondary btn-sm" onClick={cancelPendingAction}>Cancel</button>
+            <button className="btn btn-danger btn-sm" onClick={confirmPendingAction}>Confirm Delete</button>
+          </div>
+        )}
+
         {/* Input */}
         <div style={{ borderTop: "1px solid #E2E8F0", padding: "12px 16px", display: "flex", gap: 8 }}>
           <input className="field-input" value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
             placeholder="Ask about your projects or say 'add a task'..."
-            disabled={loading} style={{ flex: 1, borderRadius: 10 }} />
-          <button className="btn btn-primary" onClick={() => sendMessage(input)} disabled={loading || !input.trim()}
+            disabled={loading || !!pendingConfirm} style={{ flex: 1, borderRadius: 10 }} />
+          <button className="btn btn-primary" onClick={() => sendMessage(input)} disabled={loading || !!pendingConfirm || !input.trim()}
             style={{ borderRadius: 10, padding: "9px 18px" }}>Send</button>
         </div>
       </div>
@@ -1454,7 +1499,7 @@ function App(){
 
   const loadFromGH=useCallback(async()=>{setSyncStatus("loading");try{const{data,sha}=await gh.load();shaRef.current=sha;if(data){setProjects(data.projects||[]);setTasks(data.tasks||[]);setLogs(data.logs||[]);setMilestones(data.milestones||[]);}setSyncStatus("ok");setLastSync(new Date());}catch(e){console.error(e);setSyncStatus("error");}setLoading(false);},[]);
   useEffect(()=>{if(authed)loadFromGH();},[authed,loadFromGH]);
-  const saveToGH=useCallback(async(p,t,l,m)=>{setSyncStatus("saving");try{const data={projects:p,tasks:t,logs:l,milestones:m,lastUpdated:new Date().toISOString()};const ns=await gh.save(data,shaRef.current);shaRef.current=ns;setSyncStatus("ok");setLastSync(new Date());}catch(e){console.error(e);if(e.message&&e.message.includes("does not match"))await loadFromGH();setSyncStatus("error");}},[loadFromGH]);
+  const saveToGH=useCallback(async(p,t,l,m,message)=>{setSyncStatus("saving");try{const data={projects:p,tasks:t,logs:l,milestones:m,lastUpdated:new Date().toISOString()};const ns=await gh.save(data,shaRef.current,message);shaRef.current=ns;setSyncStatus("ok");setLastSync(new Date());}catch(e){console.error(e);if(e.message&&e.message.includes("does not match"))await loadFromGH();setSyncStatus("error");}},[loadFromGH]);
 
   // Queued, debounced save: prevents concurrent writes from racing and clobbering each other
   // when multiple state changes happen quickly (e.g. AI adding 3 tasks in one turn)
@@ -1463,11 +1508,21 @@ function App(){
   const latestDataRef = useRef({ projects, tasks, logs, milestones });
   latestDataRef.current = { projects, tasks, logs, milestones };
 
+  // Short human-readable descriptions of what changed, accumulated by the mutation
+  // handlers below and drained into the next commit message — turns git history
+  // into a real audit trail instead of a bare timestamp.
+  const changeLogRef = useRef([]);
+  const logChange = (desc) => { changeLogRef.current.push(desc); };
+
   const flushSave = useCallback(async () => {
     if (savingRef.current) { pendingRef.current = true; return; }
     savingRef.current = true;
     const { projects: p, tasks: t, logs: l, milestones: m } = latestDataRef.current;
-    await saveToGH(p, t, l, m);
+    // Drain right before the actual save call so changes that arrive while this
+    // save is in flight are captured by the *next* flush, not lost or duplicated.
+    const changes = changeLogRef.current.splice(0);
+    const message = changes.length ? changes.slice(0, 5).join("; ") + (changes.length > 5 ? " (+" + (changes.length - 5) + " more)" : "") : "Sync";
+    await saveToGH(p, t, l, m, message);
     savingRef.current = false;
     if (pendingRef.current) { pendingRef.current = false; flushSave(); }
   }, [saveToGH]);
@@ -1486,16 +1541,16 @@ function App(){
   }, [projects, tasks, logs, milestones, loading, scheduleSave]);
 
   // All mutations use functional setState (no stale closures) — safe to call rapidly in sequence
-  const addProject=p=>{setProjects(prev=>[...prev,p]);setModal(null);};
-  const updateProject=p=>{setProjects(prev=>prev.map(x=>x.id===p.id?p:x));setModal(null);setEditItem(null);};
-  const deleteProject=id=>{if(!confirm("Delete project and all data?"))return;setProjects(prev=>prev.filter(x=>x.id!==id));setTasks(prev=>prev.filter(x=>x.projectId!==id));setLogs(prev=>prev.filter(x=>x.projectId!==id));setMilestones(prev=>prev.filter(x=>x.projectId!==id));setView("overview");};
-  const addTask=t=>{setTasks(prev=>[...prev,t]);setModal(null);};
-  const updateTask=t=>{setTasks(prev=>prev.map(x=>x.id===t.id?t:x));setModal(null);setEditItem(null);};
-  const deleteTask=id=>setTasks(prev=>prev.filter(x=>x.id!==id));
-  const addLog=l=>{setLogs(prev=>[l,...prev]);setModal(null);};
-  const deleteLog=id=>setLogs(prev=>prev.filter(x=>x.id!==id));
-  const addMilestone=m=>{setMilestones(prev=>[...prev,m]);setModal(null);};
-  const deleteMilestone=id=>setMilestones(prev=>prev.filter(x=>x.id!==id));
+  const addProject=p=>{logChange("created project '"+p.name+"'");setProjects(prev=>[...prev,p]);setModal(null);};
+  const updateProject=p=>{logChange("updated project '"+p.name+"'");setProjects(prev=>prev.map(x=>x.id===p.id?p:x));setModal(null);setEditItem(null);};
+  const deleteProject=id=>{if(!confirm("Delete project and all data?"))return;const name=projects.find(x=>x.id===id)?.name||id;logChange("deleted project '"+name+"'");setProjects(prev=>prev.filter(x=>x.id!==id));setTasks(prev=>prev.filter(x=>x.projectId!==id));setLogs(prev=>prev.filter(x=>x.projectId!==id));setMilestones(prev=>prev.filter(x=>x.projectId!==id));setView("overview");};
+  const addTask=t=>{logChange("created task '"+t.title+"'");setTasks(prev=>[...prev,t]);setModal(null);};
+  const updateTask=t=>{logChange("updated task '"+t.title+"'");setTasks(prev=>prev.map(x=>x.id===t.id?t:x));setModal(null);setEditItem(null);};
+  const deleteTask=id=>{const title=tasks.find(x=>x.id===id)?.title||id;logChange("deleted task '"+title+"'");setTasks(prev=>prev.filter(x=>x.id!==id));};
+  const addLog=l=>{logChange("logged '"+l.activity+"'");setLogs(prev=>[l,...prev]);setModal(null);};
+  const deleteLog=id=>{const activity=logs.find(x=>x.id===id)?.activity||id;logChange("deleted log '"+activity+"'");setLogs(prev=>prev.filter(x=>x.id!==id));};
+  const addMilestone=m=>{logChange("added milestone '"+m.title+"'");setMilestones(prev=>[...prev,m]);setModal(null);};
+  const deleteMilestone=id=>{const title=milestones.find(x=>x.id===id)?.title||id;logChange("deleted milestone '"+title+"'");setMilestones(prev=>prev.filter(x=>x.id!==id));};
 
   const activeProjectId=view.startsWith("project:")?view.split(":")[1]:null;
   const activeProject=projects.find(p=>p.id===activeProjectId);
@@ -1561,16 +1616,16 @@ function App(){
         {view==="journeymap"&&<InteractiveMindMap tree={journeyTree} title="🗺️ All Projects — Journey Mind Map" />}
 
         {view==="ai"&&<AIAssistant projects={projects} tasks={tasks} logs={logs} milestones={milestones}
-          onAddProject={addProject}
-          onUpdateProject={p=>setProjects(prev=>prev.map(x=>x.id===p.id?p:x))}
-          onAddTask={t=>setTasks(prev=>[...prev,t])}
-          onUpdateTask={t=>setTasks(prev=>prev.map(x=>x.id===t.id?t:x))}
-          onAddLog={l=>setLogs(prev=>[l,...prev])}
-          onAddMilestone={m=>setMilestones(prev=>[...prev,m])}
-          onDeleteProject={id=>{setProjects(prev=>prev.filter(x=>x.id!==id));setTasks(prev=>prev.filter(x=>x.projectId!==id));setLogs(prev=>prev.filter(x=>x.projectId!==id));setMilestones(prev=>prev.filter(x=>x.projectId!==id));}}
-          onDeleteTask={id=>setTasks(prev=>prev.filter(x=>x.id!==id))}
-          onDeleteLog={id=>setLogs(prev=>prev.filter(x=>x.id!==id))}
-          onDeleteMilestone={id=>setMilestones(prev=>prev.filter(x=>x.id!==id))} />}
+          onAddProject={p=>{logChange("created project '"+p.name+"' (via AI)");setProjects(prev=>[...prev,p]);}}
+          onUpdateProject={p=>{logChange("updated project '"+p.name+"' (via AI)");setProjects(prev=>prev.map(x=>x.id===p.id?p:x));}}
+          onAddTask={t=>{logChange("created task '"+t.title+"' (via AI)");setTasks(prev=>[...prev,t]);}}
+          onUpdateTask={t=>{logChange("updated task '"+t.title+"' (via AI)");setTasks(prev=>prev.map(x=>x.id===t.id?t:x));}}
+          onAddLog={l=>{logChange("logged '"+l.activity+"' (via AI)");setLogs(prev=>[l,...prev]);}}
+          onAddMilestone={m=>{logChange("added milestone '"+m.title+"' (via AI)");setMilestones(prev=>[...prev,m]);}}
+          onDeleteProject={id=>{const name=projects.find(x=>x.id===id)?.name||id;logChange("deleted project '"+name+"' (via AI)");setProjects(prev=>prev.filter(x=>x.id!==id));setTasks(prev=>prev.filter(x=>x.projectId!==id));setLogs(prev=>prev.filter(x=>x.projectId!==id));setMilestones(prev=>prev.filter(x=>x.projectId!==id));}}
+          onDeleteTask={id=>{const title=tasks.find(x=>x.id===id)?.title||id;logChange("deleted task '"+title+"' (via AI)");setTasks(prev=>prev.filter(x=>x.id!==id));}}
+          onDeleteLog={id=>{const activity=logs.find(x=>x.id===id)?.activity||id;logChange("deleted log '"+activity+"' (via AI)");setLogs(prev=>prev.filter(x=>x.id!==id));}}
+          onDeleteMilestone={id=>{const title=milestones.find(x=>x.id===id)?.title||id;logChange("deleted milestone '"+title+"' (via AI)");setMilestones(prev=>prev.filter(x=>x.id!==id));}} />}
 
         {activeProject&&<>
           <div className="card" style={{marginBottom:18,borderLeft:"5px solid "+activeProject.color}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}><div><div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={()=>setView("overview")} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:"#64748B",padding:0}}>←</button><h2 style={{fontSize:18,fontWeight:800}}>{activeProject.name}</h2></div>{activeProject.description&&<div style={{fontSize:13,color:"#64748B",marginTop:4,marginLeft:28}}>{activeProject.description}</div>}<div style={{fontSize:12,color:"#94A3B8",marginTop:4,marginLeft:28}}>{activeProject.owner&&<>Stakeholder: <b>{activeProject.owner}</b> &bull; </>}{fmtDate(activeProject.startDate)} → {fmtDate(activeProject.targetEnd)}</div></div><div style={{display:"flex",alignItems:"center",gap:14}} className="no-print"><div className="ring-container"><Ring pct={projProgress(activeProjectId)} size={64} stroke={6} color={activeProject.color}/><div className="ring-text" style={{fontSize:14,color:activeProject.color}}>{projProgress(activeProjectId)}%</div></div><div style={{display:"flex",flexDirection:"column",gap:4}}><button className="btn btn-secondary btn-sm" onClick={()=>{setEditItem(activeProject);setModal("project");}}>Edit</button><button className="btn btn-danger btn-sm" onClick={()=>deleteProject(activeProjectId)}>Delete</button></div></div></div><div style={{display:"flex",gap:16,marginTop:14,paddingTop:14,borderTop:"1px solid #F1F5F9",fontSize:13,color:"#475569",flexWrap:"wrap"}}><span>📋 <b>{projTasks(activeProjectId).length}</b> Tasks</span><span>✅ <b>{projTasks(activeProjectId).filter(t=>t.status==="Completed").length}</b> Done</span><span>🔄 <b>{projTasks(activeProjectId).filter(t=>t.status==="In Progress").length}</b> In Progress</span><span>📝 <b>{projLogs(activeProjectId).length}</b> Logs</span><span>🎯 <b>{projMilestones(activeProjectId).length}</b> Milestones</span></div></div>
