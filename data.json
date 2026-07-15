@@ -186,12 +186,12 @@
       "assignedBy": "Pranav Kulkarni",
       "source": "Self",
       "priority": "High",
-      "status": "Not Started",
+      "status": "In Progress",
       "deadline": "2026-07-16",
       "projectId": "mrj39rr1iu2j2",
       "remarks": "",
       "createdAt": "2026-07-14",
-      "updatedAt": "2026-07-14"
+      "updatedAt": "2026-07-15"
     },
     {
       "title": "Sim Ready Asset Creation",
@@ -255,5 +255,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-15T05:09:14.152Z"
+  "lastUpdated": "2026-07-15T05:09:27.209Z"
 }
