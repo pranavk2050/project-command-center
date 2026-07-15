@@ -1,0 +1,38 @@
+name: Daily Briefing
+
+on:
+  schedule:
+    - cron: "30 2 * * *"  # 08:00 IST daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  generate-briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate briefing
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: node .github/scripts/generate-briefing.js
+
+      - name: Commit briefing.json if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain briefing.json)" ]; then
+            git add briefing.json
+            git commit -m "Daily briefing: $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "No briefing changes to commit."
+          fi
