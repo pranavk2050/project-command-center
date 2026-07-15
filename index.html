@@ -132,10 +132,14 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const todayStr = () => new Date().toISOString().split("T")[0];
 const fmtDate = d => { if (!d) return "\u2014"; const p = d.split("-"); return p[2]+"/"+p[1]+"/"+p[0]; };
 const daysBetween = (a, b) => Math.ceil((new Date(a) - new Date(b)) / 86400000);
+const isOverdue = (task, today) => task.status !== "Completed" && !!task.deadline && task.deadline < today;
 const PRIORITY = { High:{bg:"#FEE2E2",tx:"#991B1B"}, Medium:{bg:"#FEF9C3",tx:"#854D0E"}, Low:{bg:"#DBEAFE",tx:"#1E40AF"} };
 const STATUS = { "Not Started":{bg:"#F3F4F6",tx:"#374151"}, "In Progress":{bg:"#DBEAFE",tx:"#1E40AF"}, "On Hold":{bg:"#FEF9C3",tx:"#854D0E"}, Completed:{bg:"#D1FAE5",tx:"#065F46"}, Overdue:{bg:"#FEE2E2",tx:"#991B1B"} };
 const PROJECT_COLORS = ["#2563EB","#7C3AED","#059669","#DC2626","#D97706","#0891B2","#BE185D","#4F46E5","#15803D","#B91C1C"];
 const SC = { "Not Started":"#94A3B8", "In Progress":"#2563EB", "On Hold":"#D97706", Completed:"#059669", Overdue:"#DC2626" };
+// Above this many total projects+tasks+milestones, the AI system prompt switches from a full
+// data dump to a compact summary + the search_data tool, to keep prompt size from growing unbounded.
+const CONTEXT_SUMMARY_THRESHOLD = 30;
 
 /* ═══ GITHUB SYNC ═══ */
 const gh = {
@@ -170,7 +174,7 @@ function buildJourneyTree(projects, tasks, milestones) {
       const pct = pT.length ? Math.round(done / pT.length * 100) : 0;
       const groups = {};
       pT.forEach(t => {
-        const isOv = t.status !== "Completed" && t.deadline && t.deadline < todayStr();
+        const isOv = isOverdue(t, todayStr());
         const key = isOv ? "Overdue" : t.status;
         if (!groups[key]) groups[key] = [];
         groups[key].push(t);
@@ -201,7 +205,7 @@ function buildProjectTree(project, tasks, milestones, logs) {
   const pct = tasks.length ? Math.round(tasks.filter(t => t.status === "Completed").length / tasks.length * 100) : 0;
   const groups = {};
   tasks.forEach(t => {
-    const isOv = t.status !== "Completed" && t.deadline && t.deadline < todayStr();
+    const isOv = isOverdue(t, todayStr());
     const key = isOv ? "Overdue" : t.status;
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
@@ -489,6 +493,9 @@ const AGENT_TOOLS = [
   { name: "restore_deleted_item", description: "Restore a previously deleted project, task, log entry, or milestone by searching GitHub's saved history for the last version before it was deleted. Use this specifically when the user asks to undo, restore, bring back, or recover something that was deleted. Non-destructive — safe to call without extra confirmation.",
     properties: { itemType: { type: "string", description: "One of: project, task, log, milestone" }, searchText: { type: "string", description: "Name, title, or activity text of the deleted item to search for" } },
     required: ["itemType", "searchText"] },
+  { name: "search_data", description: "Look up specific projects, tasks, milestones, or logs by keyword. Use this when you need details not already visible in your context (e.g. full descriptions, remarks, exact deadlines) — especially when your data context is a compact summary rather than a full dump.",
+    properties: { query: { type: "string", description: "Keyword or partial name/title/activity text to search for" }, itemType: { type: "string", description: "One of: project, task, milestone, log, all. Defaults to all." } },
+    required: ["query"] },
   { name: "set_project_value", description: "Save a business-value statement on a project — what it delivers to the organization, for leadership visibility. Only call this after drafting the statement in your reply and the user has approved it (or explicitly asked you to save a specific statement).",
     properties: { projectName: { type: "string", description: "Name or partial name of the project" }, valueCategory: { type: "string", description: "One of: Cost Savings / Efficiency, Risk / Compliance, Revenue / Client Impact, Process Improvement, Capability Building" }, valueStatement: { type: "string", description: "1-2 plain-English sentences describing the value delivered" }, valueImpact: { type: "string", description: "Optional rough estimate, e.g. '3 hrs/week saved' or '$5k cost avoided'" } },
     required: ["projectName", "valueStatement"] }
@@ -513,9 +520,144 @@ function toolLabel(name, args) {
   if (name === "delete_log") return "Deleting log entry \"" + (args.activityText || "").slice(0, 30) + "\"";
   if (name === "delete_milestone") return "Deleting milestone \"" + (args.milestoneTitle || "") + "\"";
   if (name === "restore_deleted_item") return "Searching history to restore \"" + (args.searchText || "") + "\"";
+  if (name === "search_data") return "Looking up \"" + (args.query || "") + "\"";
   if (name === "set_project_value") return "Saving business value for \"" + (args.projectName || "") + "\"";
   return "Running " + name;
 }
+
+/* ═══ PER-PROVIDER AGENT ADAPTERS ═══
+   Each adapter knows how to: build the initial message list in its provider's
+   native shape, call that provider's API, pull {toolCalls, text, rawAssistantTurn}
+   out of the response, and append the assistant turn / tool results back onto
+   the running message list. runAgentLoop() (inside AIAssistant) drives all four
+   through the same generic step loop. */
+const PROVIDER_ADAPTERS = {
+  anthropic: {
+    buildInitialMessages(sysPrompt, history, userText) {
+      const msgs = [];
+      history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
+      msgs.push({ role: "user", content: userText });
+      return msgs;
+    },
+    toolSchema: anthropicToolSchema,
+    async callModel(messages, tools, apiKey, extra, sysPrompt) {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1024, system: sysPrompt, tools, messages })
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Anthropic API error: " + r.status); }
+      return await r.json();
+    },
+    extractStep(data) {
+      const content = data.content || [];
+      const toolCalls = content.filter(c => c.type === "tool_use").map(c => ({ id: c.id, name: c.name, args: c.input }));
+      const text = content.filter(c => c.type === "text").map(c => c.text).join("");
+      return { toolCalls, text, rawAssistantTurn: content };
+    },
+    appendAssistantTurn(messages, rawAssistantTurn) { messages.push({ role: "assistant", content: rawAssistantTurn }); },
+    appendToolResults(messages, toolCalls, results) {
+      messages.push({ role: "user", content: toolCalls.map((tc, i) => ({ type: "tool_result", tool_use_id: tc.id, content: JSON.stringify(results[i]) })) });
+    }
+  },
+
+  groq: {
+    buildInitialMessages(sysPrompt, history, userText) {
+      const msgs = [{ role: "system", content: sysPrompt }];
+      history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
+      msgs.push({ role: "user", content: userText });
+      return msgs;
+    },
+    toolSchema: groqToolSchema,
+    async callModel(messages, tools, apiKey) {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages, tools, tool_choice: "auto", max_tokens: 1024 })
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Groq API error: " + r.status); }
+      const data = await r.json();
+      const msg = data.choices?.[0]?.message;
+      if (!msg) throw new Error("Empty response from Groq.");
+      return msg;
+    },
+    extractStep(msg) {
+      const toolCalls = (msg.tool_calls || []).map(tc => { let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (e) {} return { id: tc.id, name: tc.function.name, args }; });
+      return { toolCalls, text: msg.content || "", rawAssistantTurn: msg };
+    },
+    appendAssistantTurn(messages, rawAssistantTurn) { messages.push(rawAssistantTurn); },
+    appendToolResults(messages, toolCalls, results) {
+      toolCalls.forEach((tc, i) => messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(results[i]) }));
+    }
+  },
+
+  gemini: {
+    buildInitialMessages(sysPrompt, history, userText) {
+      const contents = [];
+      history.forEach(m => {
+        if (m.role === "user") contents.push({ role: "user", parts: [{ text: m.text }] });
+        else if (m.role === "assistant") contents.push({ role: "model", parts: [{ text: m.text }] });
+      });
+      contents.push({ role: "user", parts: [{ text: userText }] });
+      return contents;
+    },
+    toolSchema: geminiToolSchema,
+    async callModel(contents, tools, apiKey, extra, sysPrompt) {
+      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ system_instruction: { parts: [{ text: sysPrompt }] }, tools, contents })
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Gemini API error: " + r.status); }
+      return await r.json();
+    },
+    extractStep(data) {
+      const cand = data.candidates?.[0];
+      const parts = cand?.content?.parts || [];
+      const toolCalls = parts.filter(p => p.functionCall).map(p => ({ name: p.functionCall.name, args: p.functionCall.args || {} }));
+      const text = parts.filter(p => p.text).map(p => p.text).join("");
+      return { toolCalls, text, rawAssistantTurn: parts };
+    },
+    appendAssistantTurn(messages, rawAssistantTurn) { messages.push({ role: "model", parts: rawAssistantTurn }); },
+    appendToolResults(messages, toolCalls, results) {
+      messages.push({ role: "user", parts: toolCalls.map((tc, i) => ({ functionResponse: { name: tc.name, response: results[i] } })) });
+    }
+  },
+
+  ollama: {
+    buildInitialMessages(sysPrompt, history, userText) {
+      const msgs = [{ role: "system", content: sysPrompt }];
+      history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
+      msgs.push({ role: "user", content: userText });
+      return msgs;
+    },
+    toolSchema: groqToolSchema, // OpenAI-compatible format, same as Groq
+    async callModel(messages, tools, apiKey, extra) {
+      let r;
+      try {
+        r = await fetch(apiKey + "/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: extra.model, messages, tools, tool_choice: "auto", max_tokens: 1024 })
+        });
+      } catch (netErr) {
+        throw new Error("Can't reach Ollama at " + apiKey + ". Make sure Ollama is running locally and OLLAMA_ORIGINS allows this site.");
+      }
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || ("Ollama error: " + r.status + ". Check the model name '" + extra.model + "' is pulled (run: ollama pull " + extra.model + ")")); }
+      const data = await r.json();
+      const msg = data.choices?.[0]?.message;
+      if (!msg) throw new Error("Empty response from Ollama.");
+      return msg;
+    },
+    extractStep(msg) {
+      const toolCalls = (msg.tool_calls || []).map(tc => { let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (e) {} return { id: tc.id || uid(), name: tc.function.name, args }; });
+      return { toolCalls, text: msg.content || "", rawAssistantTurn: msg };
+    },
+    appendAssistantTurn(messages, rawAssistantTurn) { messages.push(rawAssistantTurn); },
+    appendToolResults(messages, toolCalls, results) {
+      toolCalls.forEach((tc, i) => messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(results[i]) }));
+    }
+  }
+};
 
 /* ═══ AI ASSISTANT AGENT ═══ */
 function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onUpdateProject, onAddTask, onUpdateTask, onAddLog, onAddMilestone, onDeleteProject, onDeleteTask, onDeleteLog, onDeleteMilestone }) {
@@ -574,10 +716,16 @@ function AIAssistant({ projects, tasks, logs, milestones, onAddProject, onUpdate
 
   const buildSystemPrompt = () => {
     const now = todayStr();
-    const overdue = tasks.filter(t => t.status !== "Completed" && t.deadline && t.deadline < now);
+    const overdue = tasks.filter(t => isOverdue(t, now));
     const inProg = tasks.filter(t => t.status === "In Progress");
     const recentLogs = logs.slice(0, 8);
-    const ctx = `TODAY: ${now}\nPROFILE: ${PROFILE.name}, ${PROFILE.role}\n\nPROJECTS (${projects.length}):\n${projects.map(p => { const pT=tasks.filter(t=>t.projectId===p.id); const done=pT.filter(t=>t.status==="Completed").length; const pct=pT.length?Math.round(done/pT.length*100):0; return "- "+p.name+" [id:"+p.id+"] ("+pct+"% done, "+pT.length+" tasks, stakeholder: "+(p.owner||"N/A")+", deadline: "+(p.targetEnd||"N/A")+", value: "+(p.valueStatement?("["+  (p.valueCategory||"uncategorized")+"] "+p.valueStatement+(p.valueImpact?" ("+p.valueImpact+")":"")):"not yet documented")+")"; }).join("\n")}\n\nALL TASKS (${tasks.length}):\n${tasks.map(t => { const proj=projects.find(p=>p.id===t.projectId); const isOv=t.status!=="Completed"&&t.deadline&&t.deadline<now; return "- ["+(isOv?"OVERDUE":t.status)+'] "'+t.title+'" | Project: '+(proj?.name||"?")+" ["+t.projectId+"] | Priority: "+t.priority+" | Deadline: "+(t.deadline||"none")+" | By: "+(t.assignedBy||"self")+" | Source: "+t.source; }).join("\n")}\n\nOVERDUE (${overdue.length}): ${overdue.map(t=>'"'+t.title+'" ('+daysBetween(now,t.deadline)+"d late)").join(", ")||"None"}\nIN PROGRESS (${inProg.length}): ${inProg.map(t=>'"'+t.title+'"').join(", ")||"None"}\n\nMILESTONES (${milestones.length}):\n${milestones.map(m => { const proj=projects.find(p=>p.id===m.projectId); return '- "'+m.title+'" | Project: '+(proj?.name||"?")+" ["+m.projectId+"] | "+m.progress+"% | Status: "+m.status+" | Target: "+(m.targetDate||"N/A"); }).join("\n")}\n\nRECENT LOGS (last 8):\n${recentLogs.map(l => { const proj=projects.find(p=>p.id===l.projectId); return "- "+l.date+" | "+(l.duration||"?")+" | "+(l.category||"")+" | \""+l.activity+'" | Project: '+(proj?.name||"General")+" | Outcome: "+(l.outcome||"N/A"); }).join("\n")}`;
+    const isLargeDataset = (projects.length + tasks.length + milestones.length) > CONTEXT_SUMMARY_THRESHOLD;
+
+    const ctx = isLargeDataset
+      // Compact summary for large datasets — full details are fetched on demand via search_data
+      ? `TODAY: ${now}\nPROFILE: ${PROFILE.name}, ${PROFILE.role}\n\nPROJECTS (${projects.length}):\n${projects.map(p => { const pT=tasks.filter(t=>t.projectId===p.id); const done=pT.filter(t=>t.status==="Completed").length; const pct=pT.length?Math.round(done/pT.length*100):0; return "- "+p.name+" [id:"+p.id+"] ("+pct+"% done, "+pT.length+" tasks)"; }).join("\n")}\n\nOVERDUE (${overdue.length}): ${overdue.map(t=>'"'+t.title+'" [id:'+t.projectId+'] ('+daysBetween(now,t.deadline)+"d late)").join(", ")||"None"}\nIN PROGRESS (${inProg.length}): ${inProg.map(t=>'"'+t.title+'" [id:'+t.projectId+']').join(", ")||"None"}\n\nMILESTONES (${milestones.length}): ${milestones.map(m=>'"'+m.title+'" [id:'+m.projectId+'] ('+m.progress+"%)").join(", ")||"None"}\n\nThis dataset is large enough that full task/log details, descriptions, and remarks are NOT included above. Call search_data with a keyword (and optionally itemType: project/task/milestone/log) to look up full details on a specific item before answering questions about it — don't ask the user to repeat information you could look up yourself.`
+      // Full dump for small datasets (today's case) — unchanged from before
+      : `TODAY: ${now}\nPROFILE: ${PROFILE.name}, ${PROFILE.role}\n\nPROJECTS (${projects.length}):\n${projects.map(p => { const pT=tasks.filter(t=>t.projectId===p.id); const done=pT.filter(t=>t.status==="Completed").length; const pct=pT.length?Math.round(done/pT.length*100):0; return "- "+p.name+" [id:"+p.id+"] ("+pct+"% done, "+pT.length+" tasks, stakeholder: "+(p.owner||"N/A")+", deadline: "+(p.targetEnd||"N/A")+", value: "+(p.valueStatement?("["+  (p.valueCategory||"uncategorized")+"] "+p.valueStatement+(p.valueImpact?" ("+p.valueImpact+")":"")):"not yet documented")+")"; }).join("\n")}\n\nALL TASKS (${tasks.length}):\n${tasks.map(t => { const proj=projects.find(p=>p.id===t.projectId); const isOv=isOverdue(t, now); return "- ["+(isOv?"OVERDUE":t.status)+'] "'+t.title+'" | Project: '+(proj?.name||"?")+" ["+t.projectId+"] | Priority: "+t.priority+" | Deadline: "+(t.deadline||"none")+" | By: "+(t.assignedBy||"self")+" | Source: "+t.source; }).join("\n")}\n\nOVERDUE (${overdue.length}): ${overdue.map(t=>'"'+t.title+'" ('+daysBetween(now,t.deadline)+"d late)").join(", ")||"None"}\nIN PROGRESS (${inProg.length}): ${inProg.map(t=>'"'+t.title+'"').join(", ")||"None"}\n\nMILESTONES (${milestones.length}):\n${milestones.map(m => { const proj=projects.find(p=>p.id===m.projectId); return '- "'+m.title+'" | Project: '+(proj?.name||"?")+" ["+m.projectId+"] | "+m.progress+"% | Status: "+m.status+" | Target: "+(m.targetDate||"N/A"); }).join("\n")}\n\nRECENT LOGS (last 8):\n${recentLogs.map(l => { const proj=projects.find(p=>p.id===l.projectId); return "- "+l.date+" | "+(l.duration||"?")+" | "+(l.category||"")+" | \""+l.activity+'" | Project: '+(proj?.name||"General")+" | Outcome: "+(l.outcome||"N/A"); }).join("\n")}`;
 
     return `You are Pranav Kulkarni's personal project assistant embedded in his Project Command Center dashboard. You have access to ALL his current project data below, and you have tools to create projects, tasks, logs, and milestones, and to update task status.
 
@@ -720,6 +868,20 @@ DATA:\n${ctx}`;
         }
         return { success: false, message: "Couldn't find '" + args.searchText + "' as a deleted " + itemType + " in the last 50 saves. It may be older than that." };
       }
+      if (name === "search_data") {
+        const itemType = String(args.itemType || "all").toLowerCase();
+        const buckets = [];
+        if (itemType === "all" || itemType === "project") buckets.push(["project", projects, "name"]);
+        if (itemType === "all" || itemType === "task") buckets.push(["task", tasks, "title"]);
+        if (itemType === "all" || itemType === "milestone") buckets.push(["milestone", milestones, "title"]);
+        if (itemType === "all" || itemType === "log") buckets.push(["log", logs, "activity"]);
+        const results = [];
+        buckets.forEach(([type, list, field]) => {
+          fuzzyMatches(list, field, args.query).forEach(item => results.push({ type, ...item }));
+        });
+        if (!results.length) return { success: false, message: "No matches found for '" + args.query + "'" + (itemType !== "all" ? " among " + itemType + "s" : "") };
+        return { success: true, results: results.slice(0, 10) };
+      }
       if (name === "set_project_value") {
         const matches = fuzzyMatches(projects, "name", args.projectName);
         if (matches.length === 0) return { success: false, message: "No project found matching '" + args.projectName + "'" };
@@ -734,138 +896,26 @@ DATA:\n${ctx}`;
     }
   };
 
-  const runAnthropicAgent = async (userText, history, onTrace) => {
+  // Generic 6-step tool-calling loop shared by every provider — the per-provider
+  // quirks (message shape, request format, response parsing) all live in
+  // PROVIDER_ADAPTERS; this just drives them identically.
+  const runAgentLoop = async (adapter, userText, history, onTrace, extra) => {
     const sysPrompt = buildSystemPrompt();
-    let msgs = [];
-    history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
-    msgs.push({ role: "user", content: userText });
-    const tools = anthropicToolSchema();
+    const messages = adapter.buildInitialMessages(sysPrompt, history, userText);
+    const tools = adapter.toolSchema();
 
     for (let step = 0; step < 6; step++) {
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1024, system: sysPrompt, tools, messages: msgs })
-      });
-      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Anthropic API error: " + r.status); }
-      const data = await r.json();
-      const content = data.content || [];
-      const toolUses = content.filter(c => c.type === "tool_use");
-      const textParts = content.filter(c => c.type === "text").map(c => c.text).join("");
-      if (toolUses.length === 0) return textParts || "Done!";
+      const response = await adapter.callModel(messages, tools, apiKey, extra, sysPrompt);
+      const { toolCalls, text, rawAssistantTurn } = adapter.extractStep(response);
+      if (toolCalls.length === 0) return text || "Done!";
 
-      msgs.push({ role: "assistant", content });
-      const toolResults = [];
-      for (const tu of toolUses) {
-        onTrace(tu.name, tu.input);
-        const result = await executeTool(tu.name, tu.input);
-        toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(result) });
+      adapter.appendAssistantTurn(messages, rawAssistantTurn);
+      const results = [];
+      for (const tc of toolCalls) {
+        onTrace(tc.name, tc.args);
+        results.push(await executeTool(tc.name, tc.args));
       }
-      msgs.push({ role: "user", content: toolResults });
-    }
-    return "I've completed the requested actions.";
-  };
-
-  const runGroqAgent = async (userText, history, onTrace) => {
-    const sysPrompt = buildSystemPrompt();
-    let msgs = [{ role: "system", content: sysPrompt }];
-    history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
-    msgs.push({ role: "user", content: userText });
-    const tools = groqToolSchema();
-
-    for (let step = 0; step < 6; step++) {
-      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, tools, tool_choice: "auto", max_tokens: 1024 })
-      });
-      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Groq API error: " + r.status); }
-      const data = await r.json();
-      const msg = data.choices?.[0]?.message;
-      if (!msg) throw new Error("Empty response from Groq.");
-      if (msg.tool_calls && msg.tool_calls.length) {
-        msgs.push(msg);
-        for (const tc of msg.tool_calls) {
-          let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (e) {}
-          onTrace(tc.function.name, args);
-          const result = await executeTool(tc.function.name, args);
-          msgs.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
-        }
-        continue;
-      }
-      return msg.content || "Done!";
-    }
-    return "I've completed the requested actions.";
-  };
-
-  const runGeminiAgent = async (userText, history, onTrace) => {
-    const sysPrompt = buildSystemPrompt();
-    let contents = [];
-    history.forEach(m => {
-      if (m.role === "user") contents.push({ role: "user", parts: [{ text: m.text }] });
-      else if (m.role === "assistant") contents.push({ role: "model", parts: [{ text: m.text }] });
-    });
-    contents.push({ role: "user", parts: [{ text: userText }] });
-    const tools = geminiToolSchema();
-
-    for (let step = 0; step < 6; step++) {
-      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ system_instruction: { parts: [{ text: sysPrompt }] }, tools, contents })
-      });
-      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || "Gemini API error: " + r.status); }
-      const data = await r.json();
-      const cand = data.candidates?.[0];
-      const parts = cand?.content?.parts || [];
-      const fnCalls = parts.filter(p => p.functionCall);
-      const textParts = parts.filter(p => p.text).map(p => p.text).join("");
-      if (fnCalls.length === 0) return textParts || "Done!";
-
-      contents.push({ role: "model", parts });
-      const responseParts = [];
-      for (const fc of fnCalls) {
-        onTrace(fc.functionCall.name, fc.functionCall.args || {});
-        const result = await executeTool(fc.functionCall.name, fc.functionCall.args || {});
-        responseParts.push({ functionResponse: { name: fc.functionCall.name, response: result } });
-      }
-      contents.push({ role: "user", parts: responseParts });
-    }
-    return "I've completed the requested actions.";
-  };
-
-  const runOllamaAgent = async (userText, history, onTrace) => {
-    const sysPrompt = buildSystemPrompt();
-    let msgs = [{ role: "system", content: sysPrompt }];
-    history.forEach(m => { if (m.role === "user" || m.role === "assistant") msgs.push({ role: m.role, content: m.text }); });
-    msgs.push({ role: "user", content: userText });
-    const tools = groqToolSchema(); // OpenAI-compatible format, same as Groq
-
-    for (let step = 0; step < 6; step++) {
-      let r;
-      try {
-        r = await fetch(apiKey + "/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: ollamaModel, messages: msgs, tools, tool_choice: "auto", max_tokens: 1024 })
-        });
-      } catch (netErr) {
-        throw new Error("Can't reach Ollama at " + apiKey + ". Make sure Ollama is running locally and OLLAMA_ORIGINS allows this site.");
-      }
-      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || ("Ollama error: " + r.status + ". Check the model name '" + ollamaModel + "' is pulled (run: ollama pull " + ollamaModel + ")")); }
-      const data = await r.json();
-      const msg = data.choices?.[0]?.message;
-      if (!msg) throw new Error("Empty response from Ollama.");
-      if (msg.tool_calls && msg.tool_calls.length) {
-        msgs.push(msg);
-        for (const tc of msg.tool_calls) {
-          let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (e) {}
-          onTrace(tc.function.name, args);
-          const result = await executeTool(tc.function.name, args);
-          msgs.push({ role: "tool", tool_call_id: tc.id || uid(), content: JSON.stringify(result) });
-        }
-        continue;
-      }
-      return msg.content || "Done!";
+      adapter.appendToolResults(messages, toolCalls, results);
     }
     return "I've completed the requested actions.";
   };
@@ -888,11 +938,9 @@ DATA:\n${ctx}`;
       // of burning through daily token quotas fast on free tiers like Groq.
       const fullHistory = messages.slice(1).filter(m => m.role === "user" || m.role === "assistant");
       const history = fullHistory.slice(-8);
-      let reply;
-      if (provider === "anthropic") reply = await runAnthropicAgent(userText, history, onTrace);
-      else if (provider === "gemini") reply = await runGeminiAgent(userText, history, onTrace);
-      else if (provider === "ollama") reply = await runOllamaAgent(userText, history, onTrace);
-      else reply = await runGroqAgent(userText, history, onTrace);
+      const adapter = PROVIDER_ADAPTERS[provider] || PROVIDER_ADAPTERS.groq;
+      const extra = provider === "ollama" ? { model: ollamaModel } : {};
+      let reply = await runAgentLoop(adapter, userText, history, onTrace, extra);
 
       // Safety net: some smaller/free models occasionally narrate a fake success
       // ("Project X has been created") without actually calling the tool.
@@ -1456,9 +1504,9 @@ function App(){
   const projMilestones=pid=>milestones.filter(m=>m.projectId===pid);
   const projProgress=pid=>{const t=projTasks(pid);if(!t.length)return 0;return Math.round((t.filter(x=>x.status==="Completed").length/t.length)*100);};
   const totalCompleted=tasks.filter(t=>t.status==="Completed").length;
-  const totalOverdue=tasks.filter(t=>t.status!=="Completed"&&t.deadline&&t.deadline<todayStr()).length;
+  const totalOverdue=tasks.filter(t=>isOverdue(t,todayStr())).length;
   const totalInProgress=tasks.filter(t=>t.status==="In Progress").length;
-  const filteredTasks=useMemo(()=>{let list=activeProjectId?projTasks(activeProjectId):tasks;if(filterStatus!=="All")list=list.filter(t=>{if(filterStatus==="Overdue")return t.status!=="Completed"&&t.deadline&&t.deadline<todayStr();return t.status===filterStatus;});return list.sort((a,b)=>({High:0,Medium:1,Low:2}[a.priority]??1)-({High:0,Medium:1,Low:2}[b.priority]??1));},[tasks,activeProjectId,filterStatus]);
+  const filteredTasks=useMemo(()=>{let list=activeProjectId?projTasks(activeProjectId):tasks;if(filterStatus!=="All")list=list.filter(t=>{if(filterStatus==="Overdue")return isOverdue(t,todayStr());return t.status===filterStatus;});return list.sort((a,b)=>({High:0,Medium:1,Low:2}[a.priority]??1)-({High:0,Medium:1,Low:2}[b.priority]??1));},[tasks,activeProjectId,filterStatus]);
 
   const journeyTree=useMemo(()=>buildJourneyTree(projects,tasks,milestones),[projects,tasks,milestones]);
   const projectTree=useMemo(()=>activeProject?buildProjectTree(activeProject,projTasks(activeProjectId),projMilestones(activeProjectId),projLogs(activeProjectId)):null,[activeProject,tasks,milestones,logs]);
@@ -1506,8 +1554,8 @@ function App(){
 
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><h2 style={{fontSize:16,fontWeight:800}}>My Projects</h2><button className="btn btn-primary no-print" onClick={()=>setModal("project")}>+ New Project</button></div>
           {projects.length===0?<div className="card empty"><div style={{fontSize:36,marginBottom:12}}>📁</div><div style={{fontWeight:700,fontSize:15,marginBottom:6}}>No projects yet</div><button className="btn btn-primary" onClick={()=>setModal("project")} style={{marginTop:12}}>+ Create First Project</button></div>:
-          <div className="projects-grid">{projects.map(p=>{const pT=projTasks(p.id),done=pT.filter(t=>t.status==="Completed").length,ov=pT.filter(t=>t.status!=="Completed"&&t.deadline&&t.deadline<todayStr()).length,pct=projProgress(p.id);return<div key={p.id} className="card card-hover" onClick={()=>{setView("project:"+p.id);setSubTab("tasks");setFilterStatus("All");}} style={{borderLeft:"4px solid "+p.color}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,marginBottom:3}}>{p.name}{p.valueStatement&&<span title="Business value documented" style={{marginLeft:6,fontSize:12}}>💡</span>}</div>{p.description&&<div style={{fontSize:12,color:"#64748B",marginBottom:8}}>{p.description}</div>}{p.owner&&<div style={{fontSize:11,color:"#94A3B8"}}>Stakeholder: {p.owner}</div>}</div><div className="ring-container"><Ring pct={pct} color={p.color}/><div className="ring-text" style={{fontSize:12,color:p.color}}>{pct}%</div></div></div><div style={{display:"flex",gap:14,fontSize:12,color:"#64748B",marginTop:10,borderTop:"1px solid #F1F5F9",paddingTop:10,flexWrap:"wrap"}}><span>📋 {pT.length}</span><span>✅ {done}</span>{ov>0&&<span style={{color:"#DC2626",fontWeight:700}}>⚠ {ov}</span>}<span>🎯 {projMilestones(p.id).length}</span></div></div>;})}</div>}
-          {totalOverdue>0&&<div className="overdue-box"><div style={{fontWeight:800,color:"#991B1B",fontSize:13,marginBottom:10,textTransform:"uppercase"}}>⚠ Overdue Tasks</div>{tasks.filter(t=>t.status!=="Completed"&&t.deadline&&t.deadline<todayStr()).map(t=>{const proj=projects.find(p=>p.id===t.projectId);return<div key={t.id} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #FECACA",fontSize:13}}><div><b>{t.title}</b> <span style={{color:"#64748B",fontSize:11}}>({proj?.name||"\u2014"})</span></div><span style={{color:"#DC2626",fontWeight:600,fontSize:12}}>{daysBetween(todayStr(),t.deadline)}d overdue</span></div>;})}</div>}
+          <div className="projects-grid">{projects.map(p=>{const pT=projTasks(p.id),done=pT.filter(t=>t.status==="Completed").length,ov=pT.filter(t=>isOverdue(t,todayStr())).length,pct=projProgress(p.id);return<div key={p.id} className="card card-hover" onClick={()=>{setView("project:"+p.id);setSubTab("tasks");setFilterStatus("All");}} style={{borderLeft:"4px solid "+p.color}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,marginBottom:3}}>{p.name}{p.valueStatement&&<span title="Business value documented" style={{marginLeft:6,fontSize:12}}>💡</span>}</div>{p.description&&<div style={{fontSize:12,color:"#64748B",marginBottom:8}}>{p.description}</div>}{p.owner&&<div style={{fontSize:11,color:"#94A3B8"}}>Stakeholder: {p.owner}</div>}</div><div className="ring-container"><Ring pct={pct} color={p.color}/><div className="ring-text" style={{fontSize:12,color:p.color}}>{pct}%</div></div></div><div style={{display:"flex",gap:14,fontSize:12,color:"#64748B",marginTop:10,borderTop:"1px solid #F1F5F9",paddingTop:10,flexWrap:"wrap"}}><span>📋 {pT.length}</span><span>✅ {done}</span>{ov>0&&<span style={{color:"#DC2626",fontWeight:700}}>⚠ {ov}</span>}<span>🎯 {projMilestones(p.id).length}</span></div></div>;})}</div>}
+          {totalOverdue>0&&<div className="overdue-box"><div style={{fontWeight:800,color:"#991B1B",fontSize:13,marginBottom:10,textTransform:"uppercase"}}>⚠ Overdue Tasks</div>{tasks.filter(t=>isOverdue(t,todayStr())).map(t=>{const proj=projects.find(p=>p.id===t.projectId);return<div key={t.id} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #FECACA",fontSize:13}}><div><b>{t.title}</b> <span style={{color:"#64748B",fontSize:11}}>({proj?.name||"\u2014"})</span></div><span style={{color:"#DC2626",fontWeight:600,fontSize:12}}>{daysBetween(todayStr(),t.deadline)}d overdue</span></div>;})}</div>}
         </>}
 
         {view==="journeymap"&&<InteractiveMindMap tree={journeyTree} title="🗺️ All Projects — Journey Mind Map" />}
@@ -1530,7 +1578,7 @@ function App(){
 
           {subTab==="mindmap"&&projectTree&&<InteractiveMindMap tree={projectTree} title={"🗺️ "+activeProject.name+" — Project Mind Map"} />}
 
-          {subTab==="tasks"&&<><div className="filter-bar no-print"><button className="btn btn-primary" onClick={()=>{setEditItem(null);setModal("task");}}>+ New Task</button><select className="field-input" style={{maxWidth:150}} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option>All</option><option>Not Started</option><option>In Progress</option><option>On Hold</option><option>Completed</option><option>Overdue</option></select><span style={{fontSize:12,color:"#64748B",marginLeft:"auto"}}>{filteredTasks.length} task{filteredTasks.length!==1?"s":""}</span></div>{filteredTasks.length===0?<div className="card empty" style={{padding:36}}>No tasks match.</div>:filteredTasks.map(t=>{const isOv=t.status!=="Completed"&&t.deadline&&t.deadline<todayStr();return<div key={t.id} className={"task-card "+(isOv?"overdue":"")}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}><div style={{flex:1,minWidth:180}}><div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{t.title}</div>{t.description&&<div style={{fontSize:12,color:"#64748B",marginBottom:6}}>{t.description}</div>}<div style={{display:"flex",flexWrap:"wrap",gap:5,alignItems:"center"}}><Badge label={t.priority} colors={PRIORITY[t.priority]}/><Badge label={isOv?"Overdue":t.status} colors={STATUS[isOv?"Overdue":t.status]}/><span style={{fontSize:11,color:"#94A3B8"}}>via {t.source}</span></div></div><div style={{textAlign:"right",fontSize:12,color:"#64748B"}}>{t.deadline&&<div>Due: <b style={{color:isOv?"#DC2626":"#0F172A"}}>{fmtDate(t.deadline)}</b></div>}{t.assignedBy&&<div>By: {t.assignedBy}</div>}<div style={{display:"flex",gap:6,marginTop:8,justifyContent:"flex-end"}} className="no-print"><button className="btn-edit" onClick={()=>{setEditItem(t);setModal("task");}}>Edit</button><button className="btn-del" onClick={()=>deleteTask(t.id)}>Delete</button></div></div></div>{t.remarks&&<div style={{marginTop:8,padding:"7px 12px",background:"#F8FAFC",borderRadius:8,fontSize:12,color:"#64748B"}}>💬 {t.remarks}</div>}</div>;})}</>}
+          {subTab==="tasks"&&<><div className="filter-bar no-print"><button className="btn btn-primary" onClick={()=>{setEditItem(null);setModal("task");}}>+ New Task</button><select className="field-input" style={{maxWidth:150}} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option>All</option><option>Not Started</option><option>In Progress</option><option>On Hold</option><option>Completed</option><option>Overdue</option></select><span style={{fontSize:12,color:"#64748B",marginLeft:"auto"}}>{filteredTasks.length} task{filteredTasks.length!==1?"s":""}</span></div>{filteredTasks.length===0?<div className="card empty" style={{padding:36}}>No tasks match.</div>:filteredTasks.map(t=>{const isOv=isOverdue(t,todayStr());return<div key={t.id} className={"task-card "+(isOv?"overdue":"")}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}><div style={{flex:1,minWidth:180}}><div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{t.title}</div>{t.description&&<div style={{fontSize:12,color:"#64748B",marginBottom:6}}>{t.description}</div>}<div style={{display:"flex",flexWrap:"wrap",gap:5,alignItems:"center"}}><Badge label={t.priority} colors={PRIORITY[t.priority]}/><Badge label={isOv?"Overdue":t.status} colors={STATUS[isOv?"Overdue":t.status]}/><span style={{fontSize:11,color:"#94A3B8"}}>via {t.source}</span></div></div><div style={{textAlign:"right",fontSize:12,color:"#64748B"}}>{t.deadline&&<div>Due: <b style={{color:isOv?"#DC2626":"#0F172A"}}>{fmtDate(t.deadline)}</b></div>}{t.assignedBy&&<div>By: {t.assignedBy}</div>}<div style={{display:"flex",gap:6,marginTop:8,justifyContent:"flex-end"}} className="no-print"><button className="btn-edit" onClick={()=>{setEditItem(t);setModal("task");}}>Edit</button><button className="btn-del" onClick={()=>deleteTask(t.id)}>Delete</button></div></div></div>{t.remarks&&<div style={{marginTop:8,padding:"7px 12px",background:"#F8FAFC",borderRadius:8,fontSize:12,color:"#64748B"}}>💬 {t.remarks}</div>}</div>;})}</>}
 
           {subTab==="daily log"&&<><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}} className="no-print"><button className="btn btn-primary" onClick={()=>setModal("log")}>+ Add Entry</button></div><WhizibleExport logs={logs} projects={projects} /><TimeDistribution logs={projLogs(activeProjectId)} />{projLogs(activeProjectId).length===0?<div className="card empty" style={{padding:36}}>No activity logged yet.</div>:projLogs(activeProjectId).map(l=>(<div key={l.id} className="log-entry"><div className="log-date">{fmtDate(l.date)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{l.activity}</div><div style={{display:"flex",gap:14,fontSize:12,color:"#64748B",marginTop:3}}>{l.duration&&<span>⏱ {l.duration}</span>}{l.category&&<span style={{background:"#F1F5F9",padding:"1px 8px",borderRadius:5,fontSize:10,fontWeight:600}}>{l.category}</span>}{l.taskCode&&<span style={{background:"#FFF7ED",color:"#C2410C",padding:"1px 8px",borderRadius:5,fontSize:10,fontWeight:600}}>{l.taskCode}</span>}{l.outcome&&<span>✓ {l.outcome}</span>}</div></div><button className="btn-del no-print" onClick={()=>deleteLog(l.id)}>Delete</button></div>))}</>}
 
