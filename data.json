@@ -144,12 +144,12 @@
       "assignedBy": "",
       "source": "Self",
       "priority": "High",
-      "status": "Not Started",
-      "deadline": "",
+      "status": "Completed",
+      "deadline": "2026-07-01",
       "projectId": "mrj3bl7yk558j",
       "remarks": "",
       "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13"
+      "updatedAt": "2026-07-15"
     },
     {
       "id": "mrkgtreekofiq",
@@ -227,5 +227,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-15T05:03:05.589Z"
+  "lastUpdated": "2026-07-15T05:03:29.497Z"
 }
