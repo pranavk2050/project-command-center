@@ -152,20 +152,6 @@
       "updatedAt": "2026-07-13"
     },
     {
-      "id": "mrjgx6gv9wnkp",
-      "title": "Implement Testing Plan for System",
-      "description": "",
-      "assignedBy": "",
-      "source": "Self",
-      "priority": "High",
-      "status": "Not Started",
-      "deadline": "",
-      "projectId": "mrj3bl7yk558j",
-      "remarks": "",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13"
-    },
-    {
       "id": "mrjgx6gvbb2em",
       "title": "Plan Deployment Strategy and Schedule",
       "description": "",
@@ -255,5 +241,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-14T09:57:24.946Z"
+  "lastUpdated": "2026-07-15T05:03:04.670Z"
 }
