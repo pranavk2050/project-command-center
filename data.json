@@ -89,6 +89,16 @@
       "color": "#0891B2",
       "id": "mrlmdidfkfmkl",
       "createdAt": "2026-07-15"
+    },
+    {
+      "id": "mrn4nli3ahc08",
+      "name": "Digital Twin of Shimla River Network",
+      "description": "Project to model and analyze the Shimla River network using digital twin technology.",
+      "owner": "Pranav Kulkarni",
+      "startDate": "2026-07-16",
+      "targetEnd": "2026-10-30",
+      "color": "#059669",
+      "createdAt": "2026-07-16"
     }
   ],
   "tasks": [
@@ -255,5 +265,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-15T06:54:23.313Z"
+  "lastUpdated": "2026-07-16T06:27:55.178Z"
 }
