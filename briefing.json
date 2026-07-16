@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-15T09:01:03.003Z",
-  "briefing": "One task is overdue: \"Create Technical Document for Architecture\" for Video Analytics NHSRCL. Five tasks are due within the next three days, including two unnamed tasks and specific tasks for Digital Twin EGA and Digital Twin Data Center. The tasks due soon cover various integrations, video sample creation, and asset creation. All in-progress tasks are up to date, with no stale tasks reported.",
+  "generatedAt": "2026-07-16T05:23:14.184Z",
+  "briefing": "One task is overdue: \"Create Technical Document for Architecture\" for Video Analytics NHSRCL. Five tasks are due within the next three days, including two unnamed tasks, two Digital Twin EGA tasks, and \"Sim Ready Asset Creation\" for Digital Twin Data Center. All in-progress tasks are up to date, with no stale tasks reported.",
   "stats": {
     "overdueCount": 1,
     "upcomingCount": 5,
