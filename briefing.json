@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-16T05:23:14.184Z",
-  "briefing": "One task is overdue: \"Create Technical Document for Architecture\" for Video Analytics NHSRCL. Five tasks are due within the next three days, including two unnamed tasks, two Digital Twin EGA tasks, and \"Sim Ready Asset Creation\" for Digital Twin Data Center. All in-progress tasks are up to date, with no stale tasks reported.",
+  "generatedAt": "2026-07-17T05:25:17.267Z",
+  "briefing": "There are 4 overdue tasks, including \"Create Technical Document for Architecture\" and three Digital Twin EGA tasks. Three tasks are due within the next 3 days, all related to integrating order of precedence and updated prompts, but their project assignments are unclear. No in-progress tasks have gone stale, indicating that work is being actively updated. Prioritization of overdue tasks is necessary to get the projects back on track.",
   "stats": {
-    "overdueCount": 1,
-    "upcomingCount": 5,
+    "overdueCount": 4,
+    "upcomingCount": 3,
     "staleCount": 0
   }
 }
