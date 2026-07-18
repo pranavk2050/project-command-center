@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-17T05:25:17.267Z",
-  "briefing": "There are 4 overdue tasks, including \"Create Technical Document for Architecture\" and three Digital Twin EGA tasks. Three tasks are due within the next 3 days, all related to integrating order of precedence and updated prompts, but their project assignments are unclear. No in-progress tasks have gone stale, indicating that work is being actively updated. Prioritization of overdue tasks is necessary to get the projects back on track.",
+  "generatedAt": "2026-07-18T05:07:47.634Z",
+  "briefing": "There are 6 overdue tasks, including two duplicate tasks to integrate order of precedence and generic instructions. The oldest pending tasks are to create a Technical Document for Architecture and to work on indoor plant video samples for Digital Twin EGA. One task, integrating order of precedence to the main prompt, is due within the next 3 days. All in-progress tasks have been updated recently, with no stale tasks reported.",
   "stats": {
-    "overdueCount": 4,
-    "upcomingCount": 3,
+    "overdueCount": 6,
+    "upcomingCount": 1,
     "staleCount": 0
   }
 }
