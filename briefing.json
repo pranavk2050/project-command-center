@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-18T05:07:47.634Z",
-  "briefing": "There are 6 overdue tasks, including two duplicate tasks to integrate order of precedence and generic instructions. The oldest pending tasks are to create a Technical Document for Architecture and to work on indoor plant video samples for Digital Twin EGA. One task, integrating order of precedence to the main prompt, is due within the next 3 days. All in-progress tasks have been updated recently, with no stale tasks reported.",
+  "generatedAt": "2026-07-19T05:34:57.772Z",
+  "briefing": "Six tasks are overdue, including two duplicates related to integrating order of precedence and generic instructions, and one for creating a technical document for Video Analytics. Additionally, there are overdue tasks for Digital Twin EGA and Digital Twin Data Center projects. One task, integrating order of precedence to main prompt, is due within the next three days. All in-progress tasks have been updated recently, with no stale tasks reported.",
   "stats": {
     "overdueCount": 6,
     "upcomingCount": 1,
