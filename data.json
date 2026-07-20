@@ -287,6 +287,20 @@
       "id": "mrstmoy8uhlgj",
       "createdAt": "2026-07-20",
       "updatedAt": "2026-07-20"
+    },
+    {
+      "title": "Dashboard Deployment",
+      "description": "Deploy the dashboard with front and backend so that it will be accessed from internet",
+      "assignedBy": "Saikat Pathak",
+      "source": "Meeting",
+      "priority": "Medium",
+      "status": "In Progress",
+      "deadline": "2026-07-24",
+      "projectId": "mrss22szi2pay",
+      "remarks": "",
+      "id": "mrstnzp4cfr2d",
+      "createdAt": "2026-07-20",
+      "updatedAt": "2026-07-20"
     }
   ],
   "logs": [
@@ -321,5 +335,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T06:05:54.258Z"
+  "lastUpdated": "2026-07-20T06:06:54.836Z"
 }
