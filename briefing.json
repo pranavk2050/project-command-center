@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-19T05:34:57.772Z",
-  "briefing": "Six tasks are overdue, including two duplicates related to integrating order of precedence and generic instructions, and one for creating a technical document for Video Analytics. Additionally, there are overdue tasks for Digital Twin EGA and Digital Twin Data Center projects. One task, integrating order of precedence to main prompt, is due within the next three days. All in-progress tasks have been updated recently, with no stale tasks reported.",
+  "generatedAt": "2026-07-20T05:52:03.690Z",
+  "briefing": "Three overdue tasks require attention, with two \"Integrate order of precedence\" tasks lacking status updates and \"Sim Ready Asset Creation\" for Digital Twin Data Center also past due. Two tasks are due within the next three days: \"Integration of Person Talking on phone model\" and \"Create and integrate Person walking in Non-Designated Pathway\" for Digital Twin EGA. The \"Sim Ready Asset Creation\" task has not been updated in over five days, indicating a potential roadblock. These tasks need immediate review and action to get the project back on track.",
   "stats": {
-    "overdueCount": 6,
-    "upcomingCount": 1,
-    "staleCount": 0
+    "overdueCount": 3,
+    "upcomingCount": 2,
+    "staleCount": 1
   }
 }
