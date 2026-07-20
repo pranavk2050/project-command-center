@@ -260,21 +260,6 @@
       "updatedAt": "2026-07-15"
     },
     {
-      "type": "task",
-      "title": "Initiate Project",
-      "projectId": "mrj39rr3iu2j3",
-      "priority": "Low",
-      "status": "Not Started",
-      "deadline": "2026-08-31",
-      "assignedBy": "Pranav Kulkarni",
-      "source": "Self",
-      "id": "mrj6v0bhlrl11",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13",
-      "description": "",
-      "remarks": ""
-    },
-    {
       "title": "sales dashboard creation",
       "description": "Create a sales dashboard with requirements given by saikat sir",
       "assignedBy": "Saikat Pathak",
@@ -299,6 +284,35 @@
       "projectId": "mrss22szi2pay",
       "remarks": "",
       "id": "mrstnzp4cfr2d",
+      "createdAt": "2026-07-20",
+      "updatedAt": "2026-07-20"
+    },
+    {
+      "type": "task",
+      "title": "Initiate Project",
+      "projectId": "mrj39rr3iu2j3",
+      "priority": "Low",
+      "status": "Not Started",
+      "deadline": "2026-08-31",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "id": "mrj6v0bhlrl11",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13",
+      "description": "",
+      "remarks": ""
+    },
+    {
+      "title": "Integrate vehicle moving in Non-Designated Pathway in VSS",
+      "description": "Create and integrate vehicle moving in Non-Designated Pathway in VSS",
+      "assignedBy": "",
+      "source": "Meeting",
+      "priority": "Medium",
+      "status": "Not Started",
+      "deadline": "2026-07-21",
+      "projectId": "mrj39rr1iu2j2",
+      "remarks": "",
+      "id": "mrsz10fcabr48",
       "createdAt": "2026-07-20",
       "updatedAt": "2026-07-20"
     }
@@ -365,5 +379,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T07:24:57.818Z"
+  "lastUpdated": "2026-07-20T08:37:00.389Z"
 }
