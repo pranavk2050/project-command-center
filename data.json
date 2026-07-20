@@ -168,12 +168,12 @@
       "assignedBy": "",
       "source": "Self",
       "priority": "High",
-      "status": "In Progress",
+      "status": "Completed",
       "deadline": "2026-07-01",
       "projectId": "mrj3bl7yk558j",
       "remarks": "",
       "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-15"
+      "updatedAt": "2026-07-20"
     },
     {
       "id": "mrkgtreekofiq",
@@ -293,5 +293,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T05:01:01.250Z"
+  "lastUpdated": "2026-07-20T05:01:34.610Z"
 }
