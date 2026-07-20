@@ -306,6 +306,16 @@
   "logs": [
     {
       "date": "2026-07-20",
+      "activity": "Success! Your new application key has been created. It will only appear here once.\n\nkeyID:\n0052867b0c117ed0000000001\nkeyName:\nsales-dashboard-litestream\napplicationKey:\nK005AzXEyk2RqJsAlVjsnLwugq1qOms",
+      "duration": "",
+      "projectId": "mrss22szi2pay",
+      "outcome": "",
+      "category": "",
+      "taskCode": "",
+      "id": "mrsvzspdh4xof"
+    },
+    {
+      "date": "2026-07-20",
       "activity": "0057508537d6c5069cf64f48a08564207a7c5b12ee\n\nkeyID:\n2867b0c117ed\nkeyName:\nMaster Application Key\napplicationKey:\n0057508537d6c5069cf64f48a08564207a7c5b12ee",
       "duration": "",
       "projectId": "mrss22szi2pay",
@@ -345,5 +355,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T07:00:45.007Z"
+  "lastUpdated": "2026-07-20T07:12:04.872Z"
 }
