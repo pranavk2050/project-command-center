@@ -273,6 +273,20 @@
       "updatedAt": "2026-07-13",
       "description": "",
       "remarks": ""
+    },
+    {
+      "title": "sales dashboard creation",
+      "description": "Create a sales dashboard with requirements given by saikat sir",
+      "assignedBy": "Saikat Pathak",
+      "source": "Meeting",
+      "priority": "Medium",
+      "status": "In Progress",
+      "deadline": "2026-07-24",
+      "projectId": "mrss22szi2pay",
+      "remarks": "",
+      "id": "mrstmoy8uhlgj",
+      "createdAt": "2026-07-20",
+      "updatedAt": "2026-07-20"
     }
   ],
   "logs": [
@@ -307,5 +321,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T05:21:52.810Z"
+  "lastUpdated": "2026-07-20T06:05:54.258Z"
 }
