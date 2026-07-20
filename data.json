@@ -251,7 +251,7 @@
       "description": "",
       "assignedBy": "",
       "source": "Meeting",
-      "priority": "Medium",
+      "priority": "High",
       "status": "In Progress",
       "deadline": "2026-07-21",
       "projectId": "mrj39rr1iu2j2",
@@ -293,5 +293,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T05:01:34.610Z"
+  "lastUpdated": "2026-07-20T05:01:48.551Z"
 }
