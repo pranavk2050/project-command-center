@@ -177,17 +177,17 @@
     },
     {
       "id": "mrkgtreekofiq",
-      "title": "Indoor plant video sample: person talking on phone detection",
-      "description": "Create indoor plant video sample for person talking on phone detection.",
+      "title": "video samples : person talking on phone detection",
+      "description": "Synthetic video generation, three videos of actual sites on person talking on phone detection",
       "assignedBy": "Pranav Kulkarni",
       "source": "Self",
       "priority": "High",
-      "status": "In Progress",
+      "status": "Completed",
       "deadline": "2026-07-16",
       "projectId": "mrj39rr1iu2j2",
       "remarks": "",
       "createdAt": "2026-07-14",
-      "updatedAt": "2026-07-15"
+      "updatedAt": "2026-07-20"
     },
     {
       "id": "mrkgtuydo9xpw",
@@ -293,5 +293,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T04:49:10.839Z"
+  "lastUpdated": "2026-07-20T05:01:01.250Z"
 }
