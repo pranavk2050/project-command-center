@@ -231,6 +231,20 @@
       "updatedAt": "2026-07-13",
       "description": "",
       "remarks": ""
+    },
+    {
+      "title": "Integration of Person Talking on phone model, event in VSS",
+      "description": "Integrate the person talking on phone in VSS, Construct Guard",
+      "assignedBy": "",
+      "source": "Meeting",
+      "priority": "High",
+      "status": "In Progress",
+      "deadline": "2026-07-20",
+      "projectId": "mrj39rr1iu2j2",
+      "remarks": "",
+      "id": "mrsqdv4uxx1vj",
+      "createdAt": "2026-07-20",
+      "updatedAt": "2026-07-20"
     }
   ],
   "logs": [
@@ -265,5 +279,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T04:34:02.937Z"
+  "lastUpdated": "2026-07-20T04:35:03.515Z"
 }
