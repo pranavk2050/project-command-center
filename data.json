@@ -329,6 +329,20 @@
       "id": "mru3is4ta7fec",
       "createdAt": "2026-07-21",
       "updatedAt": "2026-07-21"
+    },
+    {
+      "title": "Creation of Electrical Simulation with sample data ",
+      "description": "To create electrical simulation and integrate with electrical asset",
+      "assignedBy": "",
+      "source": "Email",
+      "priority": "Medium",
+      "status": "Completed",
+      "deadline": "2026-07-20",
+      "projectId": "mrjj1jnsr9qxf",
+      "remarks": "",
+      "id": "mru3jzisngtkp",
+      "createdAt": "2026-07-21",
+      "updatedAt": "2026-07-21"
     }
   ],
   "logs": [
@@ -393,5 +407,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-21T03:30:34.090Z"
+  "lastUpdated": "2026-07-21T03:31:30.316Z"
 }
