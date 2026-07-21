@@ -315,6 +315,20 @@
       "updatedAt": "2026-07-13",
       "description": "",
       "remarks": ""
+    },
+    {
+      "title": "Creation of Thermal Simulation",
+      "description": "integrate the thermal simulation to the asset",
+      "assignedBy": "",
+      "source": "Meeting",
+      "priority": "Medium",
+      "status": "Completed",
+      "deadline": "2026-07-20",
+      "projectId": "mrjj1jnsr9qxf",
+      "remarks": "",
+      "id": "mru3is4ta7fec",
+      "createdAt": "2026-07-21",
+      "updatedAt": "2026-07-21"
     }
   ],
   "logs": [
@@ -379,5 +393,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-21T03:29:00.031Z"
+  "lastUpdated": "2026-07-21T03:30:34.090Z"
 }
