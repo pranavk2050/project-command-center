@@ -251,13 +251,13 @@
       "assignedBy": "Self",
       "source": "Email",
       "priority": "Medium",
-      "status": "In Progress",
+      "status": "Completed",
       "deadline": "2026-07-16",
       "projectId": "mrjj1jnsr9qxf",
       "remarks": "",
       "id": "mrlm8cy054182",
       "createdAt": "2026-07-15",
-      "updatedAt": "2026-07-15"
+      "updatedAt": "2026-07-21"
     },
     {
       "title": "sales dashboard creation",
@@ -288,6 +288,20 @@
       "updatedAt": "2026-07-20"
     },
     {
+      "title": "Integrate vehicle moving in Non-Designated Pathway in VSS",
+      "description": "Create and integrate vehicle moving in Non-Designated Pathway in VSS",
+      "assignedBy": "",
+      "source": "Meeting",
+      "priority": "Medium",
+      "status": "Not Started",
+      "deadline": "2026-07-21",
+      "projectId": "mrj39rr1iu2j2",
+      "remarks": "",
+      "id": "mrsz10fcabr48",
+      "createdAt": "2026-07-20",
+      "updatedAt": "2026-07-20"
+    },
+    {
       "type": "task",
       "title": "Initiate Project",
       "projectId": "mrj39rr3iu2j3",
@@ -301,20 +315,6 @@
       "updatedAt": "2026-07-13",
       "description": "",
       "remarks": ""
-    },
-    {
-      "title": "Integrate vehicle moving in Non-Designated Pathway in VSS",
-      "description": "Create and integrate vehicle moving in Non-Designated Pathway in VSS",
-      "assignedBy": "",
-      "source": "Meeting",
-      "priority": "Medium",
-      "status": "Not Started",
-      "deadline": "2026-07-21",
-      "projectId": "mrj39rr1iu2j2",
-      "remarks": "",
-      "id": "mrsz10fcabr48",
-      "createdAt": "2026-07-20",
-      "updatedAt": "2026-07-20"
     }
   ],
   "logs": [
@@ -379,5 +379,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-20T08:37:00.389Z"
+  "lastUpdated": "2026-07-21T03:29:00.031Z"
 }
