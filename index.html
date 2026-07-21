@@ -796,10 +796,11 @@ DATA:\n${ctx}`;
         return { success: true, message: "Created milestone '" + ms.title + "'" };
       }
       if (name === "update_task_status") {
-        const match = fuzzyMatches(tasks, "title", args.taskTitle)[0];
-        if (!match) return { success: false, message: "No task found matching '" + args.taskTitle + "'" };
-        onUpdateTask({ ...match, status: args.newStatus, updatedAt: todayStr() });
-        return { success: true, message: "Updated '" + match.title + "' to " + args.newStatus };
+        const matches = fuzzyMatches(tasks, "title", args.taskTitle);
+        if (matches.length === 0) return { success: false, message: "No task found matching '" + args.taskTitle + "'" };
+        if (matches.length > 1) return { success: false, message: "Multiple tasks match: " + matches.map(m => m.title).join(", ") + ". Ask the user to be more specific." };
+        onUpdateTask({ ...matches[0], status: args.newStatus, updatedAt: todayStr() });
+        return { success: true, message: "Updated '" + matches[0].title + "' to " + args.newStatus };
       }
       // Destructive tools don't mutate here — they resolve the match, then hand back
       // a needsConfirmation action. The actual delete only happens if/when the user
