@@ -135,13 +135,13 @@
       "title": "Integrate order of precedence, generic instructions, parties and updated prompts",
       "projectId": "newprojectid",
       "priority": "High",
-      "status": "Not Started",
+      "status": "Completed",
       "deadline": "2026-07-17",
       "assignedBy": "Pranav Kulkarni",
       "source": "Self",
       "id": "mrj785k3osn9w",
       "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13",
+      "updatedAt": "2026-07-21",
       "description": "",
       "remarks": ""
     },
@@ -302,21 +302,6 @@
       "updatedAt": "2026-07-20"
     },
     {
-      "type": "task",
-      "title": "Initiate Project",
-      "projectId": "mrj39rr3iu2j3",
-      "priority": "Low",
-      "status": "Not Started",
-      "deadline": "2026-08-31",
-      "assignedBy": "Pranav Kulkarni",
-      "source": "Self",
-      "id": "mrj6v0bhlrl11",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13",
-      "description": "",
-      "remarks": ""
-    },
-    {
       "title": "Creation of Thermal Simulation",
       "description": "integrate the thermal simulation to the asset",
       "assignedBy": "",
@@ -343,6 +328,21 @@
       "id": "mru3jzisngtkp",
       "createdAt": "2026-07-21",
       "updatedAt": "2026-07-21"
+    },
+    {
+      "type": "task",
+      "title": "Initiate Project",
+      "projectId": "mrj39rr3iu2j3",
+      "priority": "Low",
+      "status": "Not Started",
+      "deadline": "2026-08-31",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "id": "mrj6v0bhlrl11",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13",
+      "description": "",
+      "remarks": ""
     }
   ],
   "logs": [
@@ -407,5 +407,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-21T03:31:55.732Z"
+  "lastUpdated": "2026-07-21T07:20:39.614Z"
 }
