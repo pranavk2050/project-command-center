@@ -127,6 +127,20 @@
       "color": "#0891B2",
       "id": "mrvyrbkilpk8t",
       "createdAt": "2026-07-22"
+    },
+    {
+      "name": "Google Agentic AI",
+      "description": "Google Agentic AI : Sonata",
+      "owner": "",
+      "startDate": "2026-07-22",
+      "targetEnd": "",
+      "jobCode": "",
+      "valueCategory": "",
+      "valueStatement": "",
+      "valueImpact": "",
+      "color": "#B91C1C",
+      "id": "mrvys64im3no4",
+      "createdAt": "2026-07-22"
     }
   ],
   "tasks": [
@@ -391,5 +405,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-22T10:52:46.805Z"
+  "lastUpdated": "2026-07-22T10:53:26.407Z"
 }
