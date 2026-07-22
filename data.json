@@ -235,13 +235,13 @@
       "assignedBy": "",
       "source": "Meeting",
       "priority": "High",
-      "status": "In Progress",
+      "status": "Completed",
       "deadline": "2026-07-20",
       "projectId": "mrj39rr1iu2j2",
       "remarks": "",
       "id": "mrsqdv4uxx1vj",
       "createdAt": "2026-07-20",
-      "updatedAt": "2026-07-20"
+      "updatedAt": "2026-07-22"
     },
     {
       "title": "Create and integrate Person walking in Non-Designated Pathway in VSS",
@@ -419,5 +419,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-22T10:53:39.648Z"
+  "lastUpdated": "2026-07-22T10:53:59.329Z"
 }
