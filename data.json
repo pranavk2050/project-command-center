@@ -305,13 +305,13 @@
       "assignedBy": "",
       "source": "Meeting",
       "priority": "Medium",
-      "status": "Not Started",
+      "status": "Completed",
       "deadline": "2026-07-21",
       "projectId": "mrj39rr1iu2j2",
       "remarks": "",
       "id": "mrsz10fcabr48",
       "createdAt": "2026-07-20",
-      "updatedAt": "2026-07-20"
+      "updatedAt": "2026-07-22"
     },
     {
       "title": "Creation of Thermal Simulation",
@@ -419,5 +419,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-22T10:54:03.873Z"
+  "lastUpdated": "2026-07-22T10:54:11.778Z"
 }
