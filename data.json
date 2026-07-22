@@ -141,6 +141,20 @@
       "color": "#B91C1C",
       "id": "mrvys64im3no4",
       "createdAt": "2026-07-22"
+    },
+    {
+      "name": "MCP server creation",
+      "description": "",
+      "owner": "",
+      "startDate": "2026-07-22",
+      "targetEnd": "",
+      "jobCode": "",
+      "valueCategory": "",
+      "valueStatement": "",
+      "valueImpact": "",
+      "color": "#DC2626",
+      "id": "mrvysgchfab9c",
+      "createdAt": "2026-07-22"
     }
   ],
   "tasks": [
@@ -405,5 +419,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-22T10:53:26.407Z"
+  "lastUpdated": "2026-07-22T10:53:39.648Z"
 }
