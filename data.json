@@ -113,6 +113,20 @@
       "color": "#0891B2",
       "id": "mrss22szi2pay",
       "createdAt": "2026-07-20"
+    },
+    {
+      "name": "Drawings Compare",
+      "description": "compare the drawing (input with output pdf)",
+      "owner": "",
+      "startDate": "2026-07-22",
+      "targetEnd": "2026-07-24",
+      "jobCode": "",
+      "valueCategory": "Process Improvement",
+      "valueStatement": "",
+      "valueImpact": "",
+      "color": "#0891B2",
+      "id": "mrvyrbkilpk8t",
+      "createdAt": "2026-07-22"
     }
   ],
   "tasks": [
@@ -377,5 +391,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-21T07:31:31.538Z"
+  "lastUpdated": "2026-07-22T10:52:46.805Z"
 }
