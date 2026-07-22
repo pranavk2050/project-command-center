@@ -249,13 +249,13 @@
       "assignedBy": "",
       "source": "Meeting",
       "priority": "High",
-      "status": "In Progress",
+      "status": "Completed",
       "deadline": "2026-07-21",
       "projectId": "mrj39rr1iu2j2",
       "remarks": "",
       "id": "mrsqw0xrbydo8",
       "createdAt": "2026-07-20",
-      "updatedAt": "2026-07-20"
+      "updatedAt": "2026-07-22"
     },
     {
       "title": "Sim Ready Asset Creation",
@@ -419,5 +419,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-22T10:53:59.329Z"
+  "lastUpdated": "2026-07-22T10:54:03.873Z"
 }
