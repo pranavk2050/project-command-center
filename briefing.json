@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-21T05:33:05.993Z",
-  "briefing": "Three tasks are overdue, including two duplicate tasks to integrate order of precedence and one for Digital Twin EGA. Four tasks are due within the next three days, covering Digital Twin EGA and Sales Dashboard projects. No in-progress tasks have stalled, with all having been updated within the last five days. The duplicate overdue tasks should be prioritized for clarification and resolution.",
+  "generatedAt": "2026-07-22T05:31:54.716Z",
+  "briefing": "Three tasks are overdue: integration of Person Talking on phone model, Person walking in Non-Designated Pathway, and vehicle moving in Non-Designated Pathway, all in Digital Twin EGA. Two tasks are due within the next three days: sales dashboard creation and Dashboard Deployment, both in Sales Dashboard. No tasks have stalled with no updates in over five days. All overdue tasks require immediate attention to get the project back on track.",
   "stats": {
     "overdueCount": 3,
-    "upcomingCount": 4,
+    "upcomingCount": 2,
     "staleCount": 0
   }
 }
