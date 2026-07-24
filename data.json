@@ -369,6 +369,20 @@
       "updatedAt": "2026-07-13",
       "description": "",
       "remarks": ""
+    },
+    {
+      "title": "Wrench : go through for Agentic AI as a reference",
+      "description": "",
+      "assignedBy": "",
+      "source": "Email",
+      "priority": "Medium",
+      "status": "Not Started",
+      "deadline": "",
+      "projectId": "mryjajns9lkxm",
+      "remarks": "",
+      "id": "mryjf5cx2wlb9",
+      "createdAt": "2026-07-24",
+      "updatedAt": "2026-07-24"
     }
   ],
   "logs": [
@@ -433,5 +447,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-24T06:03:08.415Z"
+  "lastUpdated": "2026-07-24T06:06:43.160Z"
 }
