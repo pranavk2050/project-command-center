@@ -155,6 +155,20 @@
       "color": "#DC2626",
       "id": "mrvysgchfab9c",
       "createdAt": "2026-07-22"
+    },
+    {
+      "name": "Agentic PM",
+      "description": "Agentic PMP",
+      "owner": "",
+      "startDate": "2026-07-24",
+      "targetEnd": "",
+      "jobCode": "",
+      "valueCategory": "Process Improvement",
+      "valueStatement": "",
+      "valueImpact": "",
+      "color": "#DC2626",
+      "id": "mryjajns9lkxm",
+      "createdAt": "2026-07-24"
     }
   ],
   "tasks": [
@@ -419,5 +433,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-22T10:54:11.778Z"
+  "lastUpdated": "2026-07-24T06:03:08.415Z"
 }
