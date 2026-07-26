@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-25T05:26:38.957Z",
-  "briefing": "Two tasks are overdue: \"sales dashboard creation\" and \"Dashboard Deployment\", both part of the Sales Dashboard project. There are no tasks due within the next 3 days. The \"sales dashboard creation\" and \"Dashboard Deployment\" tasks have also gone stale, with no updates in over 5 days. These tasks require immediate attention to get the project back on track.",
+  "generatedAt": "2026-07-26T05:43:55.057Z",
+  "briefing": "Two tasks are overdue: \"sales dashboard creation\" and \"Dashboard Deployment\", both part of the Sales Dashboard project. There are no tasks due within the next three days. The two overdue tasks have also not been updated in over five days, indicating a need for immediate attention and progress updates. These stalled tasks require prompt resolution to get the Sales Dashboard project back on track.",
   "stats": {
     "overdueCount": 2,
     "upcomingCount": 0,
