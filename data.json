@@ -397,6 +397,20 @@
       "id": "ms4hin9gtkwiu",
       "createdAt": "2026-07-28",
       "updatedAt": "2026-07-28"
+    },
+    {
+      "title": "Scope Finalization for Digital Twin ",
+      "description": "",
+      "assignedBy": "",
+      "source": "Email",
+      "priority": "Medium",
+      "status": "Not Started",
+      "deadline": "2026-07-29",
+      "projectId": "mrjj1jnsr9qxf",
+      "remarks": "",
+      "id": "ms4hkhdg95k9t",
+      "createdAt": "2026-07-28",
+      "updatedAt": "2026-07-28"
     }
   ],
   "logs": [
@@ -461,5 +475,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-28T10:00:04.154Z"
+  "lastUpdated": "2026-07-28T10:01:29.839Z"
 }
