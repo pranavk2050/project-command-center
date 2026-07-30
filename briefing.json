@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-29T05:34:46.382Z",
-  "briefing": "Two tasks are overdue: \"sales dashboard creation\" and \"Dashboard Deployment\" for the Sales Dashboard. One task is due within 3 days: \"Scope Finalization for Digital Twin \" for the Digital Twin Data Center. Both overdue tasks have not been updated in over 5 days, requiring immediate attention to get the Sales Dashboard project back on track.",
+  "generatedAt": "2026-07-30T05:21:49.371Z",
+  "briefing": "Three tasks are overdue: sales dashboard creation, Dashboard Deployment, and Scope Finalization for Digital Twin. Two of these overdue tasks, sales dashboard creation and Dashboard Deployment, have not been updated in over 5 days. No tasks are due within the next 3 days. The Digital Twin Data Center's Scope Finalization task requires immediate attention as it is the only overdue task not also stale.",
   "stats": {
-    "overdueCount": 2,
-    "upcomingCount": 1,
+    "overdueCount": 3,
+    "upcomingCount": 0,
     "staleCount": 2
   }
 }
