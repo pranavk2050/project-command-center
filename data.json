@@ -425,6 +425,20 @@
       "id": "ms8lfebwt46xt",
       "createdAt": "2026-07-31",
       "updatedAt": "2026-07-31"
+    },
+    {
+      "title": "KPI Identifications for each Asset",
+      "description": "Identify KPI's to monitor for each Asset",
+      "assignedBy": "",
+      "source": "Email",
+      "priority": "Medium",
+      "status": "Not Started",
+      "deadline": "",
+      "projectId": "mrjj1jnsr9qxf",
+      "remarks": "",
+      "id": "ms8lhml1hofps",
+      "createdAt": "2026-07-31",
+      "updatedAt": "2026-07-31"
     }
   ],
   "logs": [
@@ -499,5 +513,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-31T07:00:35.781Z"
+  "lastUpdated": "2026-07-31T07:02:19.788Z"
 }
