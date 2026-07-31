@@ -129,20 +129,6 @@
       "createdAt": "2026-07-22"
     },
     {
-      "name": "Google Agentic AI",
-      "description": "Google Agentic AI : Sonata",
-      "owner": "",
-      "startDate": "2026-07-22",
-      "targetEnd": "",
-      "jobCode": "",
-      "valueCategory": "",
-      "valueStatement": "",
-      "valueImpact": "",
-      "color": "#B91C1C",
-      "id": "mrvys64im3no4",
-      "createdAt": "2026-07-22"
-    },
-    {
       "name": "MCP server creation",
       "description": "",
       "owner": "",
@@ -370,21 +356,6 @@
       "updatedAt": "2026-07-24"
     },
     {
-      "type": "task",
-      "title": "Initiate Project",
-      "projectId": "mrj39rr3iu2j3",
-      "priority": "Low",
-      "status": "Not Started",
-      "deadline": "2026-08-31",
-      "assignedBy": "Pranav Kulkarni",
-      "source": "Self",
-      "id": "mrj6v0bhlrl11",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13",
-      "description": "",
-      "remarks": ""
-    },
-    {
       "title": "Asset Identification in Nvidia Data Center ",
       "description": "Identify Assets Present in Data Center omni library",
       "assignedBy": "",
@@ -411,6 +382,21 @@
       "id": "ms4hkhdg95k9t",
       "createdAt": "2026-07-28",
       "updatedAt": "2026-07-28"
+    },
+    {
+      "type": "task",
+      "title": "Initiate Project",
+      "projectId": "mrj39rr3iu2j3",
+      "priority": "Low",
+      "status": "Not Started",
+      "deadline": "2026-08-31",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "id": "mrj6v0bhlrl11",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13",
+      "description": "",
+      "remarks": ""
     }
   ],
   "logs": [
@@ -485,5 +471,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-30T13:31:25.719Z"
+  "lastUpdated": "2026-07-31T06:58:14.827Z"
 }
