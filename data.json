@@ -411,6 +411,20 @@
       "id": "ms8led66duqby",
       "createdAt": "2026-07-31",
       "updatedAt": "2026-07-31"
+    },
+    {
+      "title": "Data Integration and RAG Creation",
+      "description": "RAG Creation and AIM creation",
+      "assignedBy": "",
+      "source": "Email",
+      "priority": "Medium",
+      "status": "Not Started",
+      "deadline": "2026-08-14",
+      "projectId": "mrjj1jnsr9qxf",
+      "remarks": "",
+      "id": "ms8lfebwt46xt",
+      "createdAt": "2026-07-31",
+      "updatedAt": "2026-07-31"
     }
   ],
   "logs": [
@@ -485,5 +499,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-31T06:59:47.628Z"
+  "lastUpdated": "2026-07-31T07:00:35.781Z"
 }
