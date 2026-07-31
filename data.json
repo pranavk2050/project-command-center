@@ -453,6 +453,20 @@
       "id": "ms8li6sdj45k7",
       "createdAt": "2026-07-31",
       "updatedAt": "2026-07-31"
+    },
+    {
+      "title": "KPI development and Integration",
+      "description": "",
+      "assignedBy": "",
+      "source": "Email",
+      "priority": "Medium",
+      "status": "Not Started",
+      "deadline": "",
+      "projectId": "mrjj1jnsr9qxf",
+      "remarks": "",
+      "id": "ms8liet3kghbe",
+      "createdAt": "2026-07-31",
+      "updatedAt": "2026-07-31"
     }
   ],
   "logs": [
@@ -527,5 +541,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-31T07:02:45.972Z"
+  "lastUpdated": "2026-07-31T07:02:56.367Z"
 }
