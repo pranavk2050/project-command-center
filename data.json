@@ -155,6 +155,16 @@
       "color": "#DC2626",
       "id": "mryjajns9lkxm",
       "createdAt": "2026-07-24"
+    },
+    {
+      "id": "mshfn2imvw4i4",
+      "name": "football game prediction",
+      "description": "Predicting the outcome of the upcoming England vs Spain football match",
+      "owner": "Pranav",
+      "startDate": "2026-08-06",
+      "targetEnd": "2026-10-31",
+      "color": "#059669",
+      "createdAt": "2026-08-06"
     }
   ],
   "tasks": [
@@ -384,21 +394,6 @@
       "updatedAt": "2026-07-28"
     },
     {
-      "type": "task",
-      "title": "Initiate Project",
-      "projectId": "mrj39rr3iu2j3",
-      "priority": "Low",
-      "status": "Not Started",
-      "deadline": "2026-08-31",
-      "assignedBy": "Pranav Kulkarni",
-      "source": "Self",
-      "id": "mrj6v0bhlrl11",
-      "createdAt": "2026-07-13",
-      "updatedAt": "2026-07-13",
-      "description": "",
-      "remarks": ""
-    },
-    {
       "title": "Data Collection for Assets",
       "description": "collect data for required Assets",
       "assignedBy": "",
@@ -481,6 +476,21 @@
       "id": "ms8liqswnfz2x",
       "createdAt": "2026-07-31",
       "updatedAt": "2026-07-31"
+    },
+    {
+      "type": "task",
+      "title": "Initiate Project",
+      "projectId": "mrj39rr3iu2j3",
+      "priority": "Low",
+      "status": "Not Started",
+      "deadline": "2026-08-31",
+      "assignedBy": "Pranav Kulkarni",
+      "source": "Self",
+      "id": "mrj6v0bhlrl11",
+      "createdAt": "2026-07-13",
+      "updatedAt": "2026-07-13",
+      "description": "",
+      "remarks": ""
     }
   ],
   "logs": [
@@ -555,5 +565,5 @@
       "id": "mrj4jzqftn9jw"
     }
   ],
-  "lastUpdated": "2026-07-31T07:03:11.921Z"
+  "lastUpdated": "2026-08-06T11:28:31.621Z"
 }
