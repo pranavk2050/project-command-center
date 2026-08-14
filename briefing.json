@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-13T04:23:52.556Z",
-  "briefing": "Four tasks are overdue: sales dashboard creation, Dashboard Deployment, Scope Finalization for Digital Twin, and Data Collection for Assets. One task is due within three days: Data Integration and RAG Creation for Digital Twin Data Center. Three in-progress tasks have not been updated in over five days: sales dashboard creation, Dashboard Deployment, and Asset Identification in Nvidia Data Center. These stale tasks require immediate attention to get the projects back on track.",
+  "generatedAt": "2026-08-14T04:20:57.908Z",
+  "briefing": "Four tasks are overdue: sales dashboard creation, Dashboard Deployment, Scope Finalization for Digital Twin, and Data Collection for Assets. One task is due within 3 days: Data Integration and RAG Creation for Digital Twin Data Center. Three in-progress tasks have not been updated in over 5 days: sales dashboard creation, Dashboard Deployment, and Asset Identification in Nvidia Data Center. These stalled tasks require immediate attention to get the projects back on track.",
   "stats": {
     "overdueCount": 4,
     "upcomingCount": 1,
