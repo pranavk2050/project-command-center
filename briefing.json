@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-16T03:25:06.253Z",
-  "briefing": "There are 5 overdue tasks across two projects: Sales Dashboard and Digital Twin Data Center. The overdue tasks in Sales Dashboard are \"sales dashboard creation\" and \"Dashboard Deployment\", while Digital Twin Data Center has three overdue tasks. Three tasks have also gone stale, with no updates in 5+ days, including two from Sales Dashboard and one from Digital Twin Data Center. All overdue and stale tasks require immediate attention to get the projects back on track.",
+  "generatedAt": "2026-08-17T03:24:59.284Z",
+  "briefing": "There are 5 overdue tasks, including 2 from the Sales Dashboard project and 3 from the Digital Twin Data Center project. The Sales Dashboard project has two stale in-progress tasks that have not been updated in 5+ days. The Digital Twin Data Center project also has one stale in-progress task and three overdue tasks, including Scope Finalization and Data Collection for Assets. All overdue tasks require immediate attention to get projects back on track.",
   "stats": {
     "overdueCount": 5,
     "upcomingCount": 0,
